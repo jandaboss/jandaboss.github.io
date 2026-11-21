@@ -31,27 +31,80 @@
   };
 
   // ---------- API ----------
-  async function igFetch(url) {
-    const res = await fetch(url, {
-      credentials: "include",
-      headers: { "x-ig-app-id": IG_APP_ID, "x-requested-with": "XMLHttpRequest" },
-    });
-    if (res.status === 429) throw new Error("Instagram hat zu viele Anfragen gemeldet (429). Bitte ein paar Minuten warten.");
-    if (res.status === 401 || res.status === 403) throw new Error("Kein Zugriff – bist du bei Instagram angemeldet und darfst das Profil sehen?");
-    if (!res.ok) throw new Error(`Instagram-Fehler ${res.status}`);
-    return res.json();
+  function getCookie(name) {
+    const m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+    return m ? decodeURIComponent(m[1]) : "";
   }
 
-  async function resolveUserId(username) {
-    const data = await igFetch(
-      `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`
-    );
-    const user = data?.data?.user;
-    if (!user) throw new Error(`Profil „${username}“ nicht gefunden.`);
-    if (user.is_private && !user.followed_by_viewer) {
-      throw new Error("Dieses Profil ist privat und du folgst ihm nicht.");
+  function igHeaders() {
+    const h = {
+      "x-ig-app-id": IG_APP_ID,
+      "x-requested-with": "XMLHttpRequest",
+      "x-asbd-id": "129477",
+      accept: "*/*",
+    };
+    const csrf = getCookie("csrftoken");
+    if (csrf) h["x-csrftoken"] = csrf;
+    try {
+      const claim = sessionStorage.getItem("www-claim-v2");
+      if (claim) h["x-ig-www-claim"] = claim;
+    } catch (_) { /* ignorieren */ }
+    return h;
+  }
+
+  async function igFetch(url) {
+    let res;
+    try {
+      res = await fetch(url, { credentials: "include", headers: igHeaders() });
+    } catch (e) {
+      throw new Error(`Netzwerkfehler beim Abruf von Instagram (${e.message}).`);
     }
-    return { id: user.id, total: user.edge_owner_to_timeline_media?.count ?? null };
+    const text = await res.text();
+    log("GET", url, "→", res.status, text.slice(0, 200));
+    if (res.status === 429) throw new Error("Instagram meldet zu viele Anfragen (429). Bitte ein paar Minuten warten.");
+    if (res.status === 401 || res.status === 403) throw new Error(`Kein Zugriff (${res.status}). Bist du bei Instagram angemeldet und darfst das Profil sehen?`);
+    if (!res.ok) throw new Error(`Instagram-Fehler ${res.status}: ${text.slice(0, 120)}`);
+    try {
+      return JSON.parse(text);
+    } catch (_) {
+      throw new Error("Instagram hat keine Daten geliefert (evtl. Login-Seite oder Sicherheitsabfrage). Seite neu laden und erneut versuchen.");
+    }
+  }
+
+  // Liefert { id, total }. Probiert zwei Wege, weil Instagram die API gelegentlich ändert.
+  async function resolveUserId(username) {
+    const errors = [];
+    try {
+      const data = await igFetch(
+        `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`
+      );
+      const user = data?.data?.user;
+      if (user) {
+        if (user.is_private && !user.followed_by_viewer) {
+          throw new Error("Dieses Profil ist privat und du folgst ihm nicht.");
+        }
+        return { id: user.id, total: user.edge_owner_to_timeline_media?.count ?? null };
+      }
+      errors.push("web_profile_info: kein Benutzer");
+    } catch (e) {
+      if (/privat/.test(e.message)) throw e;
+      errors.push(e.message);
+    }
+    // Fallback: ID aus dem HTML der Profilseite lesen
+    try {
+      const res = await fetch(`https://www.instagram.com/${encodeURIComponent(username)}/`, { credentials: "include" });
+      const html = await res.text();
+      const m = html.match(/"profilePage_(\d+)"/) || html.match(/"user_id":"(\d+)"/) || html.match(/"target_id":"(\d+)"/);
+      if (m) return { id: m[1], total: null };
+      errors.push("Profilseite: keine ID gefunden");
+    } catch (e) {
+      errors.push(e.message);
+    }
+    throw new Error(`Profil „${username}“ konnte nicht geladen werden. ${errors.join(" | ")}`);
+  }
+
+  function log(...args) {
+    console.log("[Zeitfilter]", ...args);
   }
 
   function pickThumb(item) {
@@ -421,5 +474,20 @@
     `;
   }
 
-  document.documentElement.append(host);
+  // Instagram baut die Seite oft neu auf und kann fremde Elemente entfernen –
+  // deshalb den Button bei Bedarf wieder einhängen.
+  function attach() {
+    if (!host.isConnected && document.body) document.body.append(host);
+  }
+  attach();
+  setInterval(attach, 1500);
+
+  // Klick auf das Extension-Symbol in der Chrome-Leiste öffnet ebenfalls das Fenster
+  globalThis.chrome?.runtime?.onMessage?.addListener((msg) => {
+    if (msg === "toggle-zeitfilter") {
+      attach();
+      overlay.classList.contains("hidden") ? open() : close();
+    }
+  });
+  log("geladen");
 })();

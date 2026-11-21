@@ -5,7 +5,8 @@ filtert sie nach einem **Zeitraum** (von Tag X bis Tag Y).
 
 ## Funktionen
 
-- 📅 Runder Button unten rechts auf instagram.com öffnet den Zeitfilter
+- 📅 Runder Button unten rechts auf instagram.com öffnet den Zeitfilter –
+  alternativ ein Klick auf das Extension-Symbol in der Chrome-Leiste (Puzzle-Symbol → Zeitfilter anheften)
 - **Von / Bis** mit Kalender-Auswahl, Schnellwahl (letzte 30 Tage, dieses/letztes Jahr, alles)
 - **Sortierung:** älteste oder neueste zuerst
 - **Typ-Filter:** Fotos, Alben, Videos, Reels
@@ -21,6 +22,16 @@ filtert sie nach einem **Zeitraum** (von Tag X bis Tag Y).
 3. Oben rechts den **Entwicklermodus** einschalten.
 4. **„Entpackte Erweiterung laden“** klicken und den Ordner `instagram-zeitfilter` auswählen.
 5. instagram.com öffnen (angemeldet), ein Profil aufrufen und auf 📅 klicken.
+
+## Wenn es nicht funktioniert
+
+1. **Richtigen Ordner geladen?** Beim Laden muss der Ordner gewählt werden, in dem direkt
+   `manifest.json` liegt (nach dem Entpacken evtl. `instagram-zeitfilter/instagram-zeitfilter`).
+2. **Nach Installation/Update:** unter `chrome://extensions` auf ⟳ (Neu laden) klicken und
+   den Instagram-Tab neu laden (F5).
+3. **Kein Button sichtbar?** Auf das Extension-Symbol in der Chrome-Leiste klicken.
+4. **Fehlermeldung im Fenster?** Den roten Text notieren. Mehr Details: `F12` → Reiter
+   „Console“ → nach `[Zeitfilter]` filtern.
 
 ## Hinweise
 
