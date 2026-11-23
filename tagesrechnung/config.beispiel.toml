@@ -43,6 +43,10 @@ kleinunternehmer = false        # true: keine USt. ausweisen, Hinweis auf § 19 
 
 zahlungsziel_tage = 14          # 0 = kein Zahlungsziel (z. B. wenn bereits bezahlt)
 
+# Bestellungen vor diesem Tag werden nie abgerechnet – wichtig für den ersten Lauf,
+# damit nicht rückwirkend Rechnungen für alte Bestellungen verschickt werden.
+# abrechnen_ab = 2026-11-24
+
 # Texte auf der Rechnung. Platzhalter: {name} {nummer} {datum} {leistungsdatum} {faellig}
 # {betrag} {firma} {bestellnummern}
 einleitung = """Guten Tag {name},
@@ -61,7 +65,7 @@ schlusstext = "Vielen Dank für Ihren Einkauf!"
 # Woher kommen die Bestellungen?
 # ---------------------------------------------------------------------------------------------
 [quelle]
-typ = "csv"                     # "csv" oder "sqlite"
+typ = "csv"                     # "csv" oder "sqlite" – für eBay: config.ebay.beispiel.toml
 pfad = "beispiel/bestellungen.csv"
 trennzeichen = "auto"           # "auto", ";", "," oder "\t"
 kodierung = "utf-8-sig"         # Excel unter Windows speichert oft "cp1252"

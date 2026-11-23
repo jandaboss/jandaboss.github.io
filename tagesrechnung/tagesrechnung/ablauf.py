@@ -58,6 +58,8 @@ def ausfuehren(
     zeitzone = konfig.speicher.zeitzone
     jetzt = (jetzt or datetime.now(zeitzone)).astimezone(zeitzone)
     von = stichtag - timedelta(days=nachholen_tage)
+    if konfig.rechnung.abrechnen_ab and von < konfig.rechnung.abrechnen_ab:
+        von = konfig.rechnung.abrechnen_ab
     pdf_ordner = konfig.speicher.probelauf if probelauf else konfig.speicher.archiv
     if versand is None:
         versand = ProbeVersand(konfig.speicher.probelauf) if probelauf else SmtpVersand(konfig.email)
@@ -73,6 +75,10 @@ def ausfuehren(
                 _zustellen(buch, versand, konfig, offen, konfig.speicher.archiv / offen.pdf_datei, bericht, zeitzone)
 
             # 2. Neue Bestellungen laden
+            if von > stichtag:
+                log.info("Keine Bestellungen abzurechnen: abrechnen_ab ist der %s",
+                         formate.datum(konfig.rechnung.abrechnen_ab))
+                return bericht
             zeitraum = formate.datum(stichtag) if von == stichtag else f"{formate.datum(von)}–{formate.datum(stichtag)}"
             try:
                 geladen = quellen.laden(konfig.quelle, von, stichtag, zeitzone, konfig.rechnung.standard_ust_satz)

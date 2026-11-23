@@ -1,6 +1,8 @@
 # Enthält Zugangsdaten – niemals einchecken
 config.toml
 *.env
+ebay-zugang.json
+*.tmp
 
 # Rechnungen, Rechnungsbuch und Kundendaten gehören nicht ins (öffentliche) Repository
 archiv/

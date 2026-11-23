@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import os
 import string
 import tomllib
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from .formate import zahl_lesen
+from .formate import datum_lesen, zahl_lesen
 
 
 class KonfigurationsFehler(Exception):
@@ -102,6 +104,7 @@ class RechnungsEinstellungen:
     standard_ust_satz: Decimal = Decimal("19")
     kleinunternehmer: bool = False
     zahlungsziel_tage: int = 14
+    abrechnen_ab: date | None = None  # ältere Bestellungen werden nie abgerechnet
     einleitung: str = STANDARD_EINLEITUNG
     zahlungshinweis: str = STANDARD_ZAHLUNGSHINWEIS
     schlusstext: str = STANDARD_SCHLUSSTEXT
@@ -111,13 +114,30 @@ class RechnungsEinstellungen:
 
 
 @dataclass
+class EbayEinstellungen:
+    client_id: str
+    ru_name: str
+    token_datei: Path
+    client_secret: str = ""
+    client_secret_env: str = "TAGESRECHNUNG_EBAY_SECRET"
+    umgebung: str = "produktion"  # "produktion" oder "sandbox"
+    nur_bezahlte: bool = True
+    versandkosten_text: str = "Versandkosten"
+    ust_saetze: dict[str, Decimal] = field(default_factory=dict)  # SKU → abweichender Steuersatz
+
+    def secret(self) -> str:
+        return os.environ.get(self.client_secret_env) or self.client_secret
+
+
+@dataclass
 class QuellenEinstellungen:
-    typ: str  # "csv" oder "sqlite"
-    pfad: Path
+    typ: str  # "csv", "sqlite" oder "ebay"
+    pfad: Path | None
     trennzeichen: str = "auto"
     kodierung: str = "utf-8-sig"
     abfrage: str = ""
     spalten: dict[str, str] = field(default_factory=dict)  # interner Name → Spaltenname in der Quelle
+    ebay: EbayEinstellungen | None = None
 
     def spaltenname(self, feld: str) -> str:
         return self.spalten.get(feld, feld)
@@ -169,15 +189,17 @@ def laden(pfad: str | Path) -> Konfiguration:
         raise KonfigurationsFehler(f"{pfad}: ungültiges TOML – {e}") from None
 
     basis = pfad.parent
-    konfig = Konfiguration(
+    quelle = _quelle(_abschnitt(daten, "quelle"), basis)
+    if quelle.typ == "ebay":
+        quelle.ebay = _ebay(_abschnitt(daten, "ebay"), basis)
+    return Konfiguration(
         firma=_firma(_abschnitt(daten, "firma"), basis),
         rechnung=_rechnung(_abschnitt(daten, "rechnung", pflicht=False), basis),
-        quelle=_quelle(_abschnitt(daten, "quelle"), basis),
+        quelle=quelle,
         email=_email(_abschnitt(daten, "email")),
         speicher=_speicher(_abschnitt(daten, "speicher", pflicht=False), basis),
         datei=pfad,
     )
-    return konfig
 
 
 # --- Hilfsfunktionen -------------------------------------------------------------------------
@@ -309,6 +331,15 @@ def _rechnung(l: _Leser, basis: Path) -> RechnungsEinstellungen:
     if startnummer < 1 or zahlungsziel < 0:
         raise KonfigurationsFehler("[rechnung] startnummer muss ≥ 1 und zahlungsziel_tage ≥ 0 sein")
 
+    abrechnen_ab = l.daten.get("abrechnen_ab")
+    if isinstance(abrechnen_ab, str):
+        try:
+            abrechnen_ab = datum_lesen(abrechnen_ab, date.today())
+        except ValueError as e:
+            raise KonfigurationsFehler(f"[rechnung] abrechnen_ab: {e}") from None
+    if abrechnen_ab is not None and not isinstance(abrechnen_ab, date):
+        raise KonfigurationsFehler("[rechnung] abrechnen_ab muss ein Datum sein, z. B. 2026-11-24")
+
     return RechnungsEinstellungen(
         nummer_format=nummer_format,
         nummernkreis_pro_jahr=pro_jahr,
@@ -318,6 +349,7 @@ def _rechnung(l: _Leser, basis: Path) -> RechnungsEinstellungen:
         standard_ust_satz=ust,
         kleinunternehmer=l.schalter("kleinunternehmer", False),
         zahlungsziel_tage=zahlungsziel,
+        abrechnen_ab=abrechnen_ab,
         einleitung=l.vorlage("einleitung", STANDARD_EINLEITUNG),
         zahlungshinweis=l.vorlage("zahlungshinweis", STANDARD_ZAHLUNGSHINWEIS),
         schlusstext=l.vorlage("schlusstext", STANDARD_SCHLUSSTEXT),
@@ -335,9 +367,9 @@ def _datei_pruefen(l: _Leser, schluessel: str, basis: Path) -> Path | None:
 
 
 def _quelle(l: _Leser, basis: Path) -> QuellenEinstellungen:
-    typ = l.auswahl("typ", "csv", ("csv", "sqlite"))
+    typ = l.auswahl("typ", "csv", ("csv", "sqlite", "ebay"))
     pfad = l.pfad("pfad", basis)
-    if pfad is None:
+    if pfad is None and typ != "ebay":
         raise KonfigurationsFehler("[quelle] pfad: Angabe fehlt")
 
     spalten_roh = l.daten.get("spalten", {})
@@ -370,6 +402,29 @@ def _quelle(l: _Leser, basis: Path) -> QuellenEinstellungen:
         kodierung=l.text("kodierung", "utf-8-sig"),
         abfrage=abfrage,
         spalten=spalten,
+    )
+
+
+def _ebay(l: _Leser, basis: Path) -> EbayEinstellungen:
+    saetze_roh = l.daten.get("ust_saetze", {})
+    if not isinstance(saetze_roh, dict):
+        raise KonfigurationsFehler("[ebay.ust_saetze] muss ein Abschnitt sein: \"SKU\" = Steuersatz")
+    saetze: dict[str, Decimal] = {}
+    for sku, satz in saetze_roh.items():
+        try:
+            saetze[str(sku).strip()] = zahl_lesen(satz)
+        except ValueError:
+            raise KonfigurationsFehler(f"[ebay.ust_saetze] {sku}: Steuersatz muss eine Zahl sein") from None
+    return EbayEinstellungen(
+        client_id=l.text("client_id"),
+        ru_name=l.text("ru_name"),
+        token_datei=l.pfad("token_datei", basis, "ebay-zugang.json"),
+        client_secret=l.text("client_secret", ""),
+        client_secret_env=l.text("client_secret_env", "TAGESRECHNUNG_EBAY_SECRET"),
+        umgebung=l.auswahl("umgebung", "produktion", ("produktion", "sandbox")),
+        nur_bezahlte=l.schalter("nur_bezahlte", True),
+        versandkosten_text=l.text("versandkosten_text", "Versandkosten"),
+        ust_saetze=saetze,
     )
 
 

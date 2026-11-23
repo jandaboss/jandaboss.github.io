@@ -1,0 +1,111 @@
+# Konfiguration für Tagesrechnung mit eBay als Quelle
+# Kopieren nach config.toml und anpassen:   cp config.ebay.beispiel.toml config.toml
+# Einrichtung Schritt für Schritt: README.md, Abschnitt „eBay-Anbindung einrichten“.
+# Relative Pfade gelten relativ zu dieser Datei.
+
+# ---------------------------------------------------------------------------------------------
+# Ihr Gewerbe – erscheint im Briefkopf und in der Fußzeile jeder Rechnung
+# ---------------------------------------------------------------------------------------------
+[firma]
+name = "Max Muster Handel"
+strasse = "Musterstraße 1"
+plz = "12345"
+ort = "Musterstadt"
+land = "Deutschland"
+telefon = ""
+email = "verkauf@example.com"
+webseite = ""
+# Steuernummer vom Finanzamt (oder USt-IdNr.) – Pflichtangabe auf jeder Rechnung (§ 14 UStG)
+steuernummer = "12/345/67890"
+ust_idnr = ""
+bank = ""
+iban = ""
+bic = ""
+# logo = "logo.png"
+
+# ---------------------------------------------------------------------------------------------
+# Rechnungen
+# ---------------------------------------------------------------------------------------------
+[rechnung]
+nummer_format = "RE-{jahr}-{nummer:05d}"
+nummernkreis_pro_jahr = true
+startnummer = 1
+
+# Kleinunternehmerregelung (§ 19 UStG): Wenn Sie keine Umsatzsteuer berechnen, auf true setzen.
+# Dann steht auf der Rechnung keine Umsatzsteuer, sondern der vorgeschriebene Hinweis.
+kleinunternehmer = false
+
+eine_rechnung_pro = "kunde"     # kauft jemand am selben Tag mehrmals, gibt es eine Sammelrechnung
+preise_sind = "brutto"          # eBay-Preise sind Endpreise
+standard_ust_satz = 19
+
+# eBay-Bestellungen sind bei Rechnungsstellung schon bezahlt → kein Zahlungsziel
+zahlungsziel_tage = 0
+zahlungshinweis = "Der Rechnungsbetrag von {betrag} wurde bereits über eBay bezahlt."
+schlusstext = "Vielen Dank für Ihren Einkauf!"
+einleitung = """Guten Tag {name},
+
+vielen Dank für Ihren Einkauf bei eBay. Hiermit erhalten Sie die Rechnung zu Ihrer Bestellung:"""
+
+# WICHTIG für den ersten Lauf: Bestellungen vor diesem Tag werden nie abgerechnet.
+# Auf den Tag setzen, ab dem das Programm Rechnungen verschicken soll.
+abrechnen_ab = 2026-11-24
+
+# ---------------------------------------------------------------------------------------------
+# Quelle: eBay
+# ---------------------------------------------------------------------------------------------
+[quelle]
+typ = "ebay"
+
+[ebay]
+client_id = "IhrName-Tagesrec-PRD-0123456789-abcdef01"   # „App ID (Client ID)“ aus dem Entwicklerkonto
+ru_name = "Ihr_Name-IhrName-Tagesr-abcdefghi"            # „RuName (eBay Redirect URL name)“
+# Die „Cert ID (Client Secret)“ NICHT hier eintragen, sondern als Umgebungsvariable:
+#   export TAGESRECHNUNG_EBAY_SECRET='PRD-…'
+client_secret_env = "TAGESRECHNUNG_EBAY_SECRET"
+token_datei = "ebay-zugang.json"     # hier speichert ebay-verbinden die Freigabe (vertraulich!)
+umgebung = "produktion"              # "sandbox" für eBays Testumgebung
+nur_bezahlte = true                  # erst abrechnen, wenn der Käufer bezahlt hat
+versandkosten_text = "Versandkosten"
+
+# Artikel mit abweichendem Steuersatz, nach eBay-Bestandseinheit (SKU). Sonst gilt standard_ust_satz.
+# Versandkosten werden bei gemischten Sätzen automatisch anteilig aufgeteilt.
+[ebay.ust_saetze]
+# "BUCH-001" = 7
+
+# ---------------------------------------------------------------------------------------------
+# E-Mail-Versand
+# eBay gibt statt der echten Käuferadresse eine verschlüsselte Adresse (…@members.ebay.com)
+# heraus und leitet Mails – auch mit PDF-Anhang – an den Käufer weiter.
+# ---------------------------------------------------------------------------------------------
+[email]
+# Am besten die E-Mail-Adresse, die auch in Ihrem eBay-Konto hinterlegt ist
+absender = "verkauf@example.com"
+absender_name = "Max Muster Handel"
+smtp_server = "smtp.example.com"
+smtp_port = 587
+sicherheit = "starttls"         # "starttls" (Port 587), "ssl" (Port 465) oder "keine"
+benutzer = "verkauf@example.com"
+#   export TAGESRECHNUNG_SMTP_PASSWORT='…'
+passwort_env = "TAGESRECHNUNG_SMTP_PASSWORT"
+# Kopie jeder Rechnung an Sie selbst – so sehen Sie, was rausgeht
+bcc = ["verkauf@example.com"]
+
+betreff = "Rechnung {nummer} zu Ihrer eBay-Bestellung"
+text = """Guten Tag {name},
+
+vielen Dank für Ihren Einkauf! Im Anhang erhalten Sie die Rechnung {nummer}
+zu Ihrer eBay-Bestellung {bestellnummern} als PDF.
+
+Mit freundlichen Grüßen
+{firma}
+"""
+
+# ---------------------------------------------------------------------------------------------
+# Ablage
+# ---------------------------------------------------------------------------------------------
+[speicher]
+archiv = "archiv"
+datenbank = "rechnungsbuch.sqlite"
+probelauf = "probelauf"
+zeitzone = "Europe/Berlin"

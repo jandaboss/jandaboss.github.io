@@ -9,6 +9,9 @@ After=network-online.target
 Type=oneshot
 User=tagesrechnung
 WorkingDirectory=/opt/tagesrechnung
-# Enthält z. B.: TAGESRECHNUNG_SMTP_PASSWORT=geheim   (Rechte: chmod 600)
-EnvironmentFile=/etc/tagesrechnung/smtp.env
-ExecStart=/opt/tagesrechnung/.venv/bin/tagesrechnung ausfuehren -c /etc/tagesrechnung/config.toml --nachholen 2
+# Enthält z. B. (Rechte: chmod 600):
+#   TAGESRECHNUNG_SMTP_PASSWORT=geheim
+#   TAGESRECHNUNG_EBAY_SECRET=PRD-…
+EnvironmentFile=/etc/tagesrechnung/geheim.env
+# --nachholen 7: auch Bestellungen der Vortage, die erst später bezahlt wurden (z. B. Auktionen)
+ExecStart=/opt/tagesrechnung/.venv/bin/tagesrechnung ausfuehren -c /etc/tagesrechnung/config.toml --nachholen 7

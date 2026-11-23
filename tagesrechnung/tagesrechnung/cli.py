@@ -5,10 +5,11 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import secrets
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from . import __version__, formate
+from . import __version__, ebay, formate
 from .ablauf import ausfuehren
 from .konfiguration import KonfigurationsFehler, laden
 from .rechnungsbuch import Rechnungsbuch
@@ -23,10 +24,14 @@ und schickt sie dem Kunden per E-Mail.
 Beispiele:
   python -m tagesrechnung ausfuehren --probelauf          Vorschau, nichts wird versendet
   python -m tagesrechnung ausfuehren                      Rechnungen für heute erstellen und versenden
-  python -m tagesrechnung ausfuehren --nachholen 2        … plus Liegengebliebenes der 2 Vortage (täglicher Lauf)
+  python -m tagesrechnung ausfuehren --nachholen 7        … plus Liegengebliebenes der 7 Vortage (täglicher Lauf)
   python -m tagesrechnung ausfuehren --datum gestern      … für die Bestellungen von gestern
   python -m tagesrechnung liste --offen                   noch nicht zugestellte Rechnungen
   python -m tagesrechnung testmail ich@example.de         SMTP-Einstellungen testen
+
+eBay (einmalig verbinden, dann prüfen):
+  python -m tagesrechnung ebay-verbinden
+  python -m tagesrechnung ebay-pruefen --tage 14
 """
 
 
@@ -59,6 +64,14 @@ def _parser() -> argparse.ArgumentParser:
 
     t = befehle.add_parser("testmail", parents=[gemeinsam], help="Test-E-Mail senden, um SMTP zu prüfen")
     t.add_argument("empfaenger", help="E-Mail-Adresse für die Testnachricht")
+
+    v = befehle.add_parser("ebay-verbinden", parents=[gemeinsam],
+                           help="Programm einmalig mit Ihrem eBay-Konto verbinden (Bestellungen lesen)")
+    v.add_argument("--adresse", help="Adresse nach der eBay-Anmeldung direkt übergeben, statt danach zu fragen")
+
+    e = befehle.add_parser("ebay-pruefen", parents=[gemeinsam],
+                           help="eBay-Bestellungen anzeigen und prüfen, ohne etwas abzurechnen")
+    e.add_argument("--tage", type=int, default=7, help="so viele Tage zurückschauen (Standard: 7)")
     return parser
 
 
@@ -88,6 +101,10 @@ def main(argv: list[str] | None = None) -> int:
         return _ausfuehren(args, konfig)
     if args.befehl == "liste":
         return _liste(args, konfig)
+    if args.befehl == "ebay-verbinden":
+        return _ebay_verbinden(args, konfig)
+    if args.befehl == "ebay-pruefen":
+        return _ebay_pruefen(args, konfig)
     return _testmail(args, konfig)
 
 
@@ -157,6 +174,90 @@ def _testmail(args, konfig) -> int:
         return 1
     log.info("Testmail an %s versendet", args.empfaenger)
     return 0
+
+
+def _ebay_einstellungen(konfig):
+    if konfig.quelle.typ != "ebay" or konfig.quelle.ebay is None:
+        log.error('Konfiguration: Für eBay muss unter [quelle] typ = "ebay" stehen und es braucht einen Abschnitt [ebay]')
+        return None
+    return konfig.quelle.ebay
+
+
+def _ebay_verbinden(args, konfig) -> int:
+    einst = _ebay_einstellungen(konfig)
+    if einst is None:
+        return 2
+    konto = ebay.EbayKonto(einst)
+    state = None
+    eingabe = args.adresse
+    if not eingabe:
+        state = secrets.token_urlsafe(16)
+        print("1. Öffnen Sie diese Adresse im Browser und melden Sie sich mit Ihrem eBay-Verkäuferkonto an:\n")
+        print(f"   {konto.anmelde_adresse(state)}\n")
+        print("2. Erlauben Sie dem Programm, Ihre Bestellungen zu lesen.")
+        print("3. Danach landen Sie auf einer anderen Seite. Kopieren Sie deren komplette Adresse aus der")
+        print("   Adresszeile des Browsers (sie enthält „code=“) und fügen Sie sie hier ein.")
+        print("   Der Code ist nur wenige Minuten gültig.\n")
+        try:
+            eingabe = input("Adresse: ")
+        except (EOFError, KeyboardInterrupt):
+            print()
+            log.error("Abgebrochen")
+            return 1
+    try:
+        bis = konto.verbinden(eingabe, state)
+    except ebay.EbayFehler as fehler:
+        log.error("%s", fehler)
+        return 1
+    log.info("Mit eBay verbunden. Die Freigabe gilt bis %s (gespeichert in %s).",
+             formate.datum(bis.astimezone(konfig.speicher.zeitzone).date()), einst.token_datei)
+    log.info("Zum Prüfen: tagesrechnung ebay-pruefen")
+    return 0
+
+
+def _ebay_pruefen(args, konfig) -> int:
+    einst = _ebay_einstellungen(konfig)
+    if einst is None:
+        return 2
+    zeitzone = konfig.speicher.zeitzone
+    heute = datetime.now(zeitzone).date()
+    von = heute - timedelta(days=max(args.tage, 0))
+    try:
+        bestellungen = ebay.abrufen(einst, von, heute, zeitzone, konfig.rechnung.standard_ust_satz)
+    except ebay.EbayFehler as fehler:
+        log.error("%s", fehler)
+        return 1
+    if not bestellungen:
+        print(f"Keine eBay-Bestellungen seit dem {formate.datum(von)}.")
+        return 0
+
+    abgerechnet: dict[str, str] = {}
+    if konfig.speicher.datenbank.is_file():
+        buch = Rechnungsbuch.oeffnen(konfig.speicher.datenbank, nur_kopie=True)
+        try:
+            abgerechnet = buch.abgerechnet(b.nummer for b in bestellungen)
+        finally:
+            buch.schliessen()
+
+    symbol = konfig.rechnung.waehrungssymbol
+    print(f"{'Bestellung':<16}  {'Datum':<16}  {'Käufer':<24}  {'Betrag':>11}  {'E-Mail':<6}  Status")
+    fehler = False
+    for b in sorted(bestellungen, key=lambda b: b.zeit):
+        if b.nummer in abgerechnet:
+            status = f"abgerechnet ({abgerechnet[b.nummer]})"
+        elif b.abrechenbar:
+            status = "wird abgerechnet"
+        elif b.fehler:
+            status, fehler = f"FEHLER: {b.grund}", True
+        else:
+            status = b.grund
+        betrag = formate.betrag(b.betrag, symbol) if b.betrag is not None else "?"
+        print(f"{b.nummer:<16}  {b.zeit:%d.%m.%Y %H:%M}  {b.kaeufer[:24]:<24}  {betrag:>11}  "
+              f"{'ja' if b.hat_email else 'NEIN':<6}  {status}")
+    bis = ebay.EbayKonto(einst).freigabe_bis()
+    if bis:
+        print(f"\neBay-Freigabe gültig bis {formate.datum(bis.astimezone(zeitzone).date())}.")
+    return 1 if fehler else 0
 
 
 if __name__ == "__main__":

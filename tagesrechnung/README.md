@@ -1,10 +1,10 @@
 # Tagesrechnung
 
 Erstellt **am Ende jedes Tages** zu den Bestellungen des Tages eine **Rechnung als PDF** und schickt sie dem
-Kunden **per E-Mail**.
+Kunden **per E-Mail**. Die Bestellungen kommen **direkt von eBay** oder aus einer CSV-Datei bzw. SQLite-Datenbank.
 
 ```
-Bestellungen (CSV-Export oder SQLite)
+Bestellungen (eBay, CSV-Export oder SQLite)
         │
         ▼
  je Kunde und Tag eine Sammelrechnung  ──►  PDF im Archiv  ──►  E-Mail mit PDF an den Kunden
@@ -37,6 +37,91 @@ tagesrechnung ausfuehren -c config.beispiel.toml --datum 22.11.2026 --probelauf
 
 Im Ordner `probelauf/` liegen danach die Rechnungen als PDF und die E-Mails als `.eml`-Dateien
 (lassen sich mit Outlook, Thunderbird oder Apple Mail öffnen).
+
+## eBay-Anbindung einrichten
+
+Das Programm holt die Bestellungen über die offizielle eBay-Schnittstelle (Sell Fulfillment API) und
+darf dabei **nur lesen**. Die Einrichtung ist einmalig.
+
+### 1. eBay-Entwicklerkonto und Schlüssel
+
+1. Auf [developer.ebay.com](https://developer.ebay.com) kostenlos für das *eBay Developers Program*
+   registrieren. Die Freischaltung des Kontos kann etwas dauern.
+2. Unter **Application Keys** einen Schlüsselsatz für **Production** anlegen. Sie erhalten
+   **App ID (Client ID)** und **Cert ID (Client Secret)**.
+3. **Marketplace Account Deletion:** eBay schaltet Produktionsschlüssel erst frei, wenn Sie entweder
+   Benachrichtigungen über gelöschte eBay-Konten empfangen (dafür ist eine öffentlich erreichbare
+   Webadresse nötig) oder eine Ausnahme beantragen. Eine Ausnahme sieht eBay vor, wenn keine eBay-Daten
+   gespeichert werden. Ihre Rechnungen enthalten aber Käuferdaten, die Sie steuerrechtlich aufbewahren
+   müssen. Wählen Sie die Variante, die Ihren tatsächlichen Umgang mit den Daten richtig beschreibt.
+   Lehnt eBay die Ausnahme ab, lässt sich eine kleine Empfangsstelle für die Benachrichtigungen ergänzen.
+4. Neben dem Production-Schlüssel auf **User Tokens** → **Get a Token from eBay via Your Application** →
+   **Add eBay Redirect URL**. Dort eintragen:
+   * *Your auth accepted URL*: eine beliebige eigene `https://`-Seite, z. B. Ihre Website. Dorthin schickt
+     eBay den Browser nach der Freigabe, mit dem Code in der Adresse.
+   * *Privacy policy URL*: die Datenschutzerklärung Ihrer Website.
+
+   eBay zeigt danach den **RuName** an (eine Zeichenkette wie `Ihr_Name-IhrName-Tagesr-abcdefghi`).
+
+### 2. Konfiguration
+
+```bash
+cp config.ebay.beispiel.toml config.toml
+```
+
+`client_id` und `ru_name` eintragen, ebenso Ihre Firmendaten, den Mailserver und `abrechnen_ab`
+(ab diesem Tag werden Rechnungen verschickt, ältere Bestellungen nie). Die Cert ID gehört in eine
+Umgebungsvariable:
+
+```bash
+export TAGESRECHNUNG_EBAY_SECRET='PRD-…'
+export TAGESRECHNUNG_SMTP_PASSWORT='…'
+```
+
+### 3. Mit eBay verbinden
+
+```bash
+tagesrechnung ebay-verbinden
+```
+
+Das Programm zeigt eine Adresse an. Öffnen Sie sie im Browser, melden Sie sich mit Ihrem
+eBay-Verkäuferkonto an und stimmen Sie zu. Danach landen Sie auf Ihrer *auth accepted URL*. Kopieren Sie
+die komplette Adresse aus der Adresszeile (sie enthält `code=`) und fügen Sie sie im Programm ein. Der Code
+ist nur wenige Minuten gültig.
+
+Die Freigabe gilt laut eBay etwa **18 Monate** und liegt in `ebay-zugang.json` (vertraulich, nicht
+weitergeben). 30 Tage vor Ablauf warnt das Programm bei jedem Lauf. Dann einfach `ebay-verbinden`
+wiederholen.
+
+### 4. Prüfen und Probelauf
+
+```bash
+tagesrechnung ebay-pruefen --tage 14       # zeigt die Bestellungen und was mit ihnen passieren würde
+tagesrechnung ausfuehren --nachholen 7 --probelauf
+```
+
+### Was mit eBay-Bestellungen passiert
+
+| Bestellung                                   | Verhalten                                                        |
+|----------------------------------------------|------------------------------------------------------------------|
+| bezahlt                                      | Rechnung wird erstellt und verschickt                            |
+| noch nicht bezahlt (z. B. Auktion)           | wartet; wird abgerechnet, sobald bezahlt (mit `--nachholen 7`)   |
+| storniert, Storno beantragt oder voll erstattet | keine Rechnung                                                |
+| teilweise erstattet                          | wird gemeldet – bitte von Hand abrechnen                         |
+| Summe passt nicht zum eBay-Gesamtbetrag      | wird gemeldet statt mit falschem Betrag abgerechnet              |
+
+* **E-Mail-Adresse:** eBay gibt statt der echten Adresse eine verschlüsselte Adresse
+  (`…@members.ebay.com`) heraus und leitet die Mail samt PDF an den Käufer weiter. eBay liefert diese
+  Adresse nur etwa 14 Tage nach dem Kauf, für den täglichen Lauf reicht das. Kann eBay eine Mail nicht
+  zustellen, schickt eBay eine Nachricht an die Absenderadresse. Behalten Sie deshalb `bcc` auf Ihre
+  eigene Adresse und schauen Sie in den ersten Tagen in Ihr Postfach.
+* **Versandkosten, Rabatte, Versandrabatte und Preisanpassungen** werden als eigene Positionen
+  aufgeführt. Bei gemischten Steuersätzen (`[ebay.ust_saetze]`) werden die Versandkosten anteilig
+  aufgeteilt.
+* **Rechnungsanschrift** ist die beim eBay-Konto des Käufers hinterlegte Adresse, ersatzweise die
+  Lieferanschrift.
+* **Rücksendungen nach dem Rechnungsversand** erzeugen keine automatische Gutschrift. Diese bitte von Hand
+  ausstellen.
 
 ## Einrichtung
 
@@ -107,9 +192,10 @@ unverändert. Die Nummern im Probelauf sind die, die der echte Lauf vergeben wü
 
 ### 5. Jeden Abend automatisch
 
-Empfohlen: **täglich um 23:55 Uhr** mit `--nachholen 2`. Bestellungen, die nach dem Lauf noch
-eingehen (23:55–23:59 Uhr), und Tage, an denen der Rechner aus war, werden beim nächsten Lauf automatisch
-mit abgerechnet. Bereits abgerechnete Bestellungen werden dabei übersprungen.
+Empfohlen: **täglich um 23:55 Uhr** mit `--nachholen 7`. Bestellungen, die nach dem Lauf noch
+eingehen (23:55–23:59 Uhr), die erst später bezahlt werden, und Tage, an denen der Rechner aus war, werden
+beim nächsten Lauf automatisch mit abgerechnet. Bereits abgerechnete Bestellungen werden dabei
+übersprungen.
 
 | System  | Datei                                                         |
 |---------|---------------------------------------------------------------|
@@ -127,12 +213,14 @@ Am **Rückgabewert** erkennt die Zeitsteuerung, ob alles geklappt hat: `0` = all
 
 ```bash
 tagesrechnung ausfuehren                    # Bestellungen von heute abrechnen und versenden
-tagesrechnung ausfuehren --nachholen 2      # … plus noch nicht abgerechnete der 2 Vortage
+tagesrechnung ausfuehren --nachholen 7      # … plus noch nicht abgerechnete der 7 Vortage
 tagesrechnung ausfuehren --datum gestern    # bestimmter Tag: gestern, 2026-11-22, 22.11.2026
 tagesrechnung ausfuehren --probelauf        # Vorschau, nichts wird versendet oder festgeschrieben
 tagesrechnung liste                         # alle Rechnungen mit Versandstatus
 tagesrechnung liste --offen                 # noch nicht zugestellte Rechnungen
 tagesrechnung testmail ich@example.com      # SMTP-Einstellungen prüfen
+tagesrechnung ebay-verbinden                # einmalig: Programm mit dem eBay-Konto verbinden
+tagesrechnung ebay-pruefen --tage 14        # eBay-Bestellungen ansehen, ohne abzurechnen
 ```
 
 Alle Befehle akzeptieren `-c pfad/zur/config.toml`, `--logdatei datei.log` und `-v`.
@@ -156,6 +244,8 @@ und vermerkt, welche Bestellung auf welcher Rechnung steht. **Sichern Sie es zus
 * Die Rechnungen enthalten die Pflichtangaben nach § 14 Abs. 4 UStG, sofern Firmen- und Kundendaten
   vollständig gepflegt sind. Rechnungen und Rechnungsbuch unterliegen den gesetzlichen
   Aufbewahrungsfristen (GoBD).
+* **Kleinunternehmer (§ 19 UStG)** setzen `kleinunternehmer = true`. Sie sind außerdem dauerhaft von der
+  Pflicht befreit, E-Rechnungen auszustellen.
 * **E-Rechnung im B2B-Bereich:** Für Rechnungen an Unternehmen in Deutschland wird die strukturierte
   E-Rechnung (XRechnung/ZUGFeRD) schrittweise Pflicht: ab 2027 für Unternehmen mit mehr als 800.000 €
   Vorjahresumsatz, ab 2028 für alle. Das Programm erzeugt PDF-Rechnungen. Für Privatkunden (B2C) genügt
@@ -172,6 +262,6 @@ pip install -e ".[test]"
 pytest
 ```
 
-Aufbau: `quellen.py` (Bestelldaten lesen) → `berechnung.py` (Bestellungen gruppieren, Summen) →
+Aufbau: `quellen.py` (Bestelldaten lesen, `ebay.py` für eBay) → `berechnung.py` (Bestellungen gruppieren, Summen) →
 `pdf.py` (Rechnung) → `versand.py` (E-Mail) · `rechnungsbuch.py` (Nummernkreis, Status) ·
 `ablauf.py` (Tageslauf) · `cli.py` (Kommandozeile).

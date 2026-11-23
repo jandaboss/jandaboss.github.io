@@ -26,7 +26,7 @@ class Projekt:
         self.ordner = ordner
         self.csv = ordner / "bestellungen.csv"
         self.config = ordner / "config.toml"
-        self.extra = {"rechnung": "", "email": "", "quelle": ""}
+        self.extra = {"rechnung": "", "email": "", "quelle": "", "ebay": ""}
         self.zeilen: list[str] = []
 
     def bestellungen(self, *zeilen: str) -> "Projekt":
@@ -38,7 +38,20 @@ class Projekt:
         self.extra[abschnitt] += textwrap.dedent(text) + "\n"
         return self
 
+    def ebay(self, text: str = "") -> "Projekt":
+        """Stellt die Quelle auf eBay um."""
+        self.extra["ebay"] = textwrap.dedent(
+            """
+            [ebay]
+            client_id = "APP-ID"
+            client_secret = "GEHEIM"
+            ru_name = "Test-RuName"
+            """
+        ) + textwrap.dedent(text)
+        return self
+
     def konfig(self):
+        quelle_kopf = 'typ = "ebay"' if self.extra["ebay"] else 'typ = "csv"\npfad = "bestellungen.csv"'
         self.config.write_text(
             textwrap.dedent(
                 """\
@@ -53,8 +66,7 @@ class Projekt:
                 [rechnung]
                 {rechnung}
                 [quelle]
-                typ = "csv"
-                pfad = "bestellungen.csv"
+                {quelle_kopf}
                 {quelle}
                 [email]
                 absender = "rechnung@test.example"
@@ -62,8 +74,9 @@ class Projekt:
                 {email}
                 [speicher]
                 zeitzone = "Europe/Berlin"
+                {ebay}
                 """
-            ).format(**self.extra),
+            ).format(quelle_kopf=quelle_kopf, **self.extra),
             encoding="utf-8",
         )
         return laden(self.config)

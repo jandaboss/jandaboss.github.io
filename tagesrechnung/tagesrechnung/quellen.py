@@ -1,4 +1,4 @@
-"""Liest Bestellpositionen aus einer CSV-Datei oder einer SQLite-Datenbank.
+"""Liest Bestellpositionen aus einer CSV-Datei, einer SQLite-Datenbank oder direkt von eBay.
 
 Jede Zeile der Quelle ist eine Bestellposition. Zusammengehörige Positionen haben dieselbe
 Bestellnummer. Welche Spalten erwartet werden, steht in ``konfiguration.FELDER``; abweichende
@@ -8,6 +8,7 @@ Spaltennamen lassen sich unter ``[quelle.spalten]`` zuordnen.
 from __future__ import annotations
 
 import csv
+import logging
 import sqlite3
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -19,6 +20,7 @@ from .formate import zahl_lesen, zeitpunkt_lesen
 from .konfiguration import FELDER, QuellenEinstellungen
 from .modelle import Kunde, Position
 
+log = logging.getLogger(__name__)
 
 class QuellenFehler(Exception):
     """Die Quelle kann gar nicht gelesen werden (Datei fehlt, Spalten fehlen, SQL-Fehler …)."""
@@ -41,6 +43,8 @@ def laden(
     standard_ust_satz: Decimal,
 ) -> Ladeergebnis:
     """Alle Positionen, deren Bestelldatum (in ``zeitzone``) zwischen ``von`` und ``bis`` liegt."""
+    if quelle.typ == "ebay":
+        return _ebay_laden(quelle, von, bis, zeitzone, standard_ust_satz)
     if quelle.typ == "csv":
         zeilen = _csv_zeilen(quelle)
     else:
@@ -66,6 +70,26 @@ def laden(
             ergebnis.fehler.append(f"{ort} (Bestellung {bestellnummer or '?'}): {e}")
             if bestellnummer:
                 ergebnis.fehlerhafte_bestellungen.add(bestellnummer)
+    return ergebnis
+
+
+def _ebay_laden(quelle: QuellenEinstellungen, von: date, bis: date, zeitzone: ZoneInfo,
+                standard_ust_satz: Decimal) -> Ladeergebnis:
+    from . import ebay
+
+    try:
+        bestellungen = ebay.abrufen(quelle.ebay, von, bis, zeitzone, standard_ust_satz)
+    except ebay.EbayFehler as fehler:
+        raise QuellenFehler(str(fehler)) from None
+    ergebnis = Ladeergebnis()
+    for b in bestellungen:
+        if b.abrechenbar:
+            ergebnis.positionen += b.positionen
+        elif b.fehler:
+            ergebnis.fehler.append(f"eBay-Bestellung {b.nummer} ({b.kaeufer}): {b.grund}")
+            ergebnis.fehlerhafte_bestellungen.add(b.nummer)
+        else:
+            log.info("eBay-Bestellung %s (%s) wird noch nicht abgerechnet: %s", b.nummer, b.kaeufer, b.grund)
     return ergebnis
 
 
