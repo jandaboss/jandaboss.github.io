@@ -1,0 +1,14 @@
+# /etc/systemd/system/tagesrechnung.service
+# Wird vom Timer (tagesrechnung.timer) jeden Abend gestartet.
+[Unit]
+Description=Tagesrechnung: Rechnungen zu den Bestellungen des Tages erstellen und versenden
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=tagesrechnung
+WorkingDirectory=/opt/tagesrechnung
+# Enthält z. B.: TAGESRECHNUNG_SMTP_PASSWORT=geheim   (Rechte: chmod 600)
+EnvironmentFile=/etc/tagesrechnung/smtp.env
+ExecStart=/opt/tagesrechnung/.venv/bin/tagesrechnung ausfuehren -c /etc/tagesrechnung/config.toml --nachholen 2

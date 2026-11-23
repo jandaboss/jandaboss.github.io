@@ -1,0 +1,17 @@
+# Enthält Zugangsdaten – niemals einchecken
+config.toml
+*.env
+
+# Rechnungen, Rechnungsbuch und Kundendaten gehören nicht ins (öffentliche) Repository
+archiv/
+probelauf/
+*.sqlite
+*.sqlite-journal
+*.log
+
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+build/
+.pytest_cache/

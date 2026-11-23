@@ -1,0 +1,6 @@
+# Eintragen mit:  crontab -e
+# Jeden Abend um 23:55 Uhr. Die Uhrzeit gilt in der Zeitzone des Rechners
+# (prüfen mit "date"; auf UTC-Servern CRON_TZ=Europe/Berlin voranstellen, falls Ihr Cron das kann).
+#
+# ~/.tagesrechnung.env enthält: TAGESRECHNUNG_SMTP_PASSWORT=geheim   (chmod 600 ~/.tagesrechnung.env)
+55 23 * * *  set -a; . "$HOME/.tagesrechnung.env"; set +a; cd /opt/tagesrechnung && .venv/bin/tagesrechnung ausfuehren -c config.toml --nachholen 2 --logdatei tagesrechnung.log

@@ -1,0 +1,14 @@
+# /etc/systemd/system/tagesrechnung.timer
+# Aktivieren:  sudo systemctl daemon-reload && sudo systemctl enable --now tagesrechnung.timer
+# Prüfen:      systemctl list-timers tagesrechnung.timer   ·   journalctl -u tagesrechnung
+[Unit]
+Description=Tagesrechnung jeden Abend um 23:55 Uhr
+
+[Timer]
+# Die Zeitzone steht dabei, damit es auch auf Servern in UTC 23:55 Uhr deutscher Zeit ist.
+OnCalendar=*-*-* 23:55:00 Europe/Berlin
+# War der Rechner um 23:55 aus, wird der Lauf beim nächsten Start nachgeholt.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tagesrechnung"
+version = "1.0.0"
+description = "Erstellt am Tagesende Rechnungen zu den Bestellungen und versendet sie per E-Mail"
+requires-python = ">=3.11"
+dependencies = [
+    "reportlab>=4.0",
+    "tzdata; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "pypdf>=4"]
+
+[project.scripts]
+tagesrechnung = "tagesrechnung.cli:main"
+
+[tool.setuptools]
+packages = ["tagesrechnung"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

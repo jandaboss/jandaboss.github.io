@@ -1,0 +1,9 @@
+bestellnummer;bestelldatum;kunden_nr;kunde_name;kunde_firma;kunde_strasse;kunde_plz;kunde_ort;kunde_land;kunde_email;kunde_ust_idnr;artikelnummer;artikel;menge;einheit;einzelpreis;ust_satz
+1001;21.11.2026 18:12;K-1002;Max Mustermann;Mustermann Bau GmbH;Hauptstraße 12;80331;München;;max@mustermann-bau.example;DE999999999;KF-250;Kaffeebohnen Espresso, 1 kg;2;Stk.;24,90;7
+1002;22.11.2026 09:41;K-1001;Erika Musterfrau;;Beispielweg 5;10115;Berlin;;erika.musterfrau@example.com;;TS-100;Teeservice „Morgenrot“, 6-teilig;1;Stk.;49,95;19
+1002;22.11.2026 09:41;K-1001;Erika Musterfrau;;Beispielweg 5;10115;Berlin;;erika.musterfrau@example.com;;;Versandkosten;1;;4,90;19
+1003;22.11.2026 11:20;K-1002;Max Mustermann;Mustermann Bau GmbH;Hauptstraße 12;80331;München;;max@mustermann-bau.example;DE999999999;SM-900;Siebträgermaschine „Barista Pro“;1;Stk.;589,00;19
+1003;22.11.2026 11:20;K-1002;Max Mustermann;Mustermann Bau GmbH;Hauptstraße 12;80331;München;;max@mustermann-bau.example;DE999999999;KF-250;Kaffeebohnen Espresso, 1 kg;3;Stk.;24,90;7
+1004;22.11.2026 15:03;K-1001;Erika Musterfrau;;Beispielweg 5;10115;Berlin;;erika.musterfrau@example.com;;KF-125;Kaffeebohnen Filter, 500 g;2;Stk.;12,90;7
+1005;22.11.2026 20:55;;Lena Beispiel;;Am Markt 3;01067;Dresden;;lena.beispiel@example.org;;MA-030;Milchaufschäumer;1;Stk.;39,99;19
+1005;22.11.2026 20:55;;Lena Beispiel;;Am Markt 3;01067;Dresden;;lena.beispiel@example.org;;KF-PROBE;Probierset Kaffee (4 × 100 g);1;Set;18,00;7

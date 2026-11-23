@@ -1,0 +1,118 @@
+# Konfiguration für Tagesrechnung
+# Kopieren nach config.toml und anpassen:   cp config.beispiel.toml config.toml
+# Relative Pfade gelten relativ zu dieser Datei.
+
+# ---------------------------------------------------------------------------------------------
+# Ihr Unternehmen – erscheint im Briefkopf und in der Fußzeile jeder Rechnung
+# ---------------------------------------------------------------------------------------------
+[firma]
+name = "Muster Kaffeerösterei GmbH"
+strasse = "Röstereiweg 1"
+plz = "12345"
+ort = "Musterstadt"
+land = "Deutschland"
+telefon = "+49 123 456789-0"
+email = "rechnung@kaffee.example"
+webseite = "www.kaffee.example"
+# Mindestens eines von beiden ist Pflicht (§ 14 UStG):
+steuernummer = "12/345/67890"
+ust_idnr = "DE000000000"
+geschaeftsfuehrung = "Maria Muster"
+handelsregister = "Amtsgericht Musterstadt HRB 12345"
+bank = "Musterbank"
+iban = "DE00 0000 0000 0000 0000 00"
+bic = "MUSTDEXXXXX"
+# logo = "logo.png"            # optional, PNG oder JPG – wird oben rechts gedruckt
+
+# ---------------------------------------------------------------------------------------------
+# Rechnungen
+# ---------------------------------------------------------------------------------------------
+[rechnung]
+# Rechnungsnummer: {jahr} und {nummer} (laufend, lückenlos). {nummer:05d} = fünfstellig mit Nullen.
+nummer_format = "RE-{jahr}-{nummer:05d}"
+nummernkreis_pro_jahr = true    # true: jedes Jahr beginnt wieder bei startnummer
+startnummer = 1                 # z. B. 431, wenn Sie bisher bis RE-2026-00430 von Hand geschrieben haben
+
+# "kunde":      eine Sammelrechnung je Kunde und Tag über alle seine Bestellungen des Tages
+# "bestellung": eine eigene Rechnung je Bestellung
+eine_rechnung_pro = "kunde"
+
+preise_sind = "brutto"          # "brutto" (inkl. USt., typisch für Shops) oder "netto"
+standard_ust_satz = 19          # gilt, wenn in den Bestelldaten kein ust_satz steht
+kleinunternehmer = false        # true: keine USt. ausweisen, Hinweis auf § 19 UStG
+
+zahlungsziel_tage = 14          # 0 = kein Zahlungsziel (z. B. wenn bereits bezahlt)
+
+# Texte auf der Rechnung. Platzhalter: {name} {nummer} {datum} {leistungsdatum} {faellig}
+# {betrag} {firma} {bestellnummern}
+einleitung = """Guten Tag {name},
+
+vielen Dank für Ihre Bestellung. Hiermit stellen wir Ihnen folgende Lieferungen und Leistungen in Rechnung:"""
+zahlungshinweis = "Bitte überweisen Sie den Rechnungsbetrag von {betrag} bis zum {faellig} unter Angabe der Rechnungsnummer {nummer} auf das unten genannte Konto."
+# Bei Shops mit Vorkasse/PayPal stattdessen z. B.:
+# zahlungshinweis = "Der Rechnungsbetrag wurde bereits beglichen. Vielen Dank!"
+schlusstext = "Vielen Dank für Ihren Einkauf!"
+
+# Optional: eigene TrueType-Schrift (nötig für Zeichen außerhalb von Westeuropa, z. B. ł, ş, ő)
+# schrift = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+# schrift_fett = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
+# ---------------------------------------------------------------------------------------------
+# Woher kommen die Bestellungen?
+# ---------------------------------------------------------------------------------------------
+[quelle]
+typ = "csv"                     # "csv" oder "sqlite"
+pfad = "beispiel/bestellungen.csv"
+trennzeichen = "auto"           # "auto", ";", "," oder "\t"
+kodierung = "utf-8-sig"         # Excel unter Windows speichert oft "cp1252"
+
+# Für eine SQLite-Datenbank stattdessen (Parameter :von, :bis, :bis_exklusiv – jeweils JJJJ-MM-TT):
+# typ = "sqlite"
+# pfad = "shop.sqlite"
+# abfrage = """
+#   SELECT * FROM bestellpositionen
+#   WHERE date(bestelldatum) BETWEEN :von AND :bis
+# """
+
+# Falls die Spalten in Ihrem Export anders heißen: interner Name = "Spaltenname in der Datei"
+[quelle.spalten]
+# bestellnummer = "Order ID"
+# bestelldatum = "Datum"
+# kunde_email = "E-Mail"
+# einzelpreis = "Preis"
+
+# ---------------------------------------------------------------------------------------------
+# E-Mail-Versand
+# ---------------------------------------------------------------------------------------------
+[email]
+absender = "rechnung@kaffee.example"
+absender_name = "Muster Kaffeerösterei"
+smtp_server = "smtp.kaffee.example"
+smtp_port = 587
+sicherheit = "starttls"         # "starttls" (Port 587), "ssl" (Port 465) oder "keine"
+benutzer = "rechnung@kaffee.example"
+# Das Passwort am besten NICHT hier eintragen, sondern als Umgebungsvariable setzen:
+#   export TAGESRECHNUNG_SMTP_PASSWORT='…'
+passwort_env = "TAGESRECHNUNG_SMTP_PASSWORT"
+# passwort = ""                 # nur falls keine Umgebungsvariable möglich ist
+antwort_an = ""                 # optional abweichende Antwortadresse
+bcc = []                        # z. B. ["buchhaltung@kaffee.example"] für eine Kopie jeder Rechnung
+
+betreff = "Ihre Rechnung {nummer} vom {datum}"
+text = """Guten Tag {name},
+
+vielen Dank für Ihre Bestellung ({bestellnummern}).
+Im Anhang erhalten Sie Ihre Rechnung {nummer} über {betrag} als PDF.
+
+Mit freundlichen Grüßen
+{firma}
+"""
+
+# ---------------------------------------------------------------------------------------------
+# Ablage
+# ---------------------------------------------------------------------------------------------
+[speicher]
+archiv = "archiv"                       # PDFs: archiv/<jahr>/<nummer>.pdf (aufbewahrungspflichtig!)
+datenbank = "rechnungsbuch.sqlite"      # Nummernkreis, abgerechnete Bestellungen, Versandstatus
+probelauf = "probelauf"                 # Ausgabe von --probelauf
+zeitzone = "Europe/Berlin"
