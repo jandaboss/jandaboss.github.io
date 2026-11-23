@@ -60,7 +60,7 @@ def test_pdf_kleinunternehmer(projekt, versand):
     ).konfig()
     ausfuehren(konfig, TAG, versand=versand, jetzt=ABEND)
     text = pdf_text(konfig.speicher.archiv / "2026" / "RE-2026-00001.pdf")
-    assert "Gemäß § 19 UStG wird keine Umsatzsteuer berechnet." in text
+    assert "Steuerbefreiung für Kleinunternehmer gemäß § 19 UStG – es wird keine Umsatzsteuer berechnet." in text
     assert "USt." not in text.replace("UStG", "")
     assert "Zahlbar bis" not in text
 

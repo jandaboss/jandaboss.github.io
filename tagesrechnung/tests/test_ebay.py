@@ -415,6 +415,7 @@ def test_ebay_beispielkonfiguration_ist_gueltig():
     assert konfig.quelle.ebay.token_datei.name == "ebay-zugang.json"
     assert konfig.rechnung.zahlungsziel_tage == 0 and "bereits" in konfig.rechnung.zahlungshinweis
     assert konfig.rechnung.abrechnen_ab == date(2026, 11, 24)
+    assert konfig.rechnung.kleinunternehmer
 
 
 def test_ebay_ohne_abschnitt(projekt):

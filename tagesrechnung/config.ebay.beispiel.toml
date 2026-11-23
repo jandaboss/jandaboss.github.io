@@ -31,13 +31,13 @@ nummer_format = "RE-{jahr}-{nummer:05d}"
 nummernkreis_pro_jahr = true
 startnummer = 1
 
-# Kleinunternehmerregelung (§ 19 UStG): Wenn Sie keine Umsatzsteuer berechnen, auf true setzen.
-# Dann steht auf der Rechnung keine Umsatzsteuer, sondern der vorgeschriebene Hinweis.
-kleinunternehmer = false
+# Kleinunternehmerregelung (§ 19 UStG): Die Rechnung weist keine Umsatzsteuer aus und enthält den
+# vorgeschriebenen Hinweis auf die Steuerbefreiung. Wer Umsatzsteuer berechnet: false.
+kleinunternehmer = true
 
 eine_rechnung_pro = "kunde"     # kauft jemand am selben Tag mehrmals, gibt es eine Sammelrechnung
 preise_sind = "brutto"          # eBay-Preise sind Endpreise
-standard_ust_satz = 19
+standard_ust_satz = 19          # nur relevant ohne Kleinunternehmerregelung
 
 # eBay-Bestellungen sind bei Rechnungsstellung schon bezahlt → kein Zahlungsziel
 zahlungsziel_tage = 0

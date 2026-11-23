@@ -39,7 +39,7 @@ eine_rechnung_pro = "kunde"
 
 preise_sind = "brutto"          # "brutto" (inkl. USt., typisch für Shops) oder "netto"
 standard_ust_satz = 19          # gilt, wenn in den Bestelldaten kein ust_satz steht
-kleinunternehmer = false        # true: keine USt. ausweisen, Hinweis auf § 19 UStG
+kleinunternehmer = false        # true: keine USt. ausweisen, Hinweis auf die Steuerbefreiung (§ 19 UStG)
 
 zahlungsziel_tage = 14          # 0 = kein Zahlungsziel (z. B. wenn bereits bezahlt)
 

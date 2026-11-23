@@ -3,7 +3,7 @@
 Enthält die Pflichtangaben nach § 14 Abs. 4 UStG: Name und Anschrift von Unternehmen und Kunde,
 Steuernummer oder USt-IdNr., Rechnungsdatum, fortlaufende Rechnungsnummer, Menge und Art der
 Lieferung, Liefer-/Leistungsdatum, Entgelt nach Steuersätzen aufgeschlüsselt, Steuersatz und
-Steuerbetrag bzw. Hinweis auf die Steuerbefreiung (§ 19 UStG).
+Steuerbetrag bzw. Hinweis auf die Steuerbefreiung für Kleinunternehmer (§ 19 UStG, § 34a UStDV).
 """
 
 from __future__ import annotations
@@ -173,7 +173,8 @@ def erzeugen(rechnung: Rechnung, konfig: Konfiguration, ziel: Path) -> None:
         Spacer(1, 7 * mm),
     ]
     if einst.kleinunternehmer:
-        inhalt += [absatz("Gemäß § 19 UStG wird keine Umsatzsteuer berechnet."), Spacer(1, 3 * mm)]
+        # Pflichthinweis nach § 34a UStDV: Die Steuerbefreiung für Kleinunternehmer muss genannt werden
+        inhalt += [absatz("Steuerbefreiung für Kleinunternehmer gemäß § 19 UStG – es wird keine Umsatzsteuer berechnet."), Spacer(1, 3 * mm)]
     if einst.zahlungshinweis:
         inhalt += [absatz(einst.zahlungshinweis.format_map(werte)), Spacer(1, 3 * mm)]
     if einst.schlusstext:
