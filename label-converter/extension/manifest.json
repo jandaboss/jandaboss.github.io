@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Label Converter – A4 zu Etikett",
+  "short_name": "Label Converter",
+  "version": "1.0.0",
+  "description": "Wandelt A4-Versandlabels (z. B. Maxibrief) in das Format deines Etikettendruckers um, etwa 100 × 150 mm. Alles läuft lokal.",
+  "minimum_chrome_version": "110",
+  "action": {
+    "default_title": "Label Converter öffnen",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["storage"]
+}

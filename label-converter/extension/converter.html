@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Label Converter</title>
+<link rel="icon" href="icons/icon32.png">
+<link rel="stylesheet" href="converter.css">
+<script src="lib/pdf-lib.min.js"></script>
+<script type="module" src="converter.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <img src="icons/icon48.png" width="28" height="28" alt="">
+    <div>
+      <b>Label Converter</b>
+      <span>A4-Versandlabel → Etikettendrucker</span>
+    </div>
+  </div>
+  <div class="topactions" id="topActions" hidden>
+    <button class="btn" id="addMore" type="button">Weitere Dateien</button>
+    <button class="btn ghost" id="clearAll" type="button">Alles entfernen</button>
+  </div>
+</header>
+
+<input type="file" id="fileInput" accept="application/pdf,.pdf,image/png,image/jpeg,.png,.jpg,.jpeg" multiple hidden>
+
+<!-- Startansicht -->
+<main class="empty" id="emptyView">
+  <section class="dropcard" id="dropCard">
+    <svg class="dropicon" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
+      <rect x="10" y="4" width="44" height="56" rx="5" fill="none" stroke="currentColor" stroke-width="3"/>
+      <rect x="17" y="12" width="30" height="20" rx="2" fill="currentColor" opacity=".18"/>
+      <rect x="17" y="12" width="30" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>
+      <path d="M32 40v13M26 47l6 6 6-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <h1>A4-Label hier ablegen</h1>
+    <p>PDF, PNG oder JPG, gern mehrere auf einmal. Das Etikett auf der Seite wird automatisch erkannt.</p>
+    <button class="btn primary big" id="pickFile" type="button">Datei auswählen</button>
+    <p class="fine">Alles bleibt auf deinem Rechner. Keine Datei wird hochgeladen.</p>
+  </section>
+  <ol class="steps">
+    <li><b>Label herunterladen</b><span>Das Versandlabel als A4-PDF speichern, wie du es vom Shop oder Portal bekommst.</span></li>
+    <li><b>Hier ablegen</b><span>Der Ausschnitt mit dem Etikett wird gefunden, gedreht und aufs Etikettenformat gebracht.</span></li>
+    <li><b>Drucken</b><span>Als PDF im Etikettenformat herunterladen und auf dem Etikettendrucker drucken.</span></li>
+  </ol>
+</main>
+
+<!-- Arbeitsansicht -->
+<main class="work" id="workView" hidden>
+  <section class="editor" aria-label="Ausschnitt wählen">
+    <div class="edhead">
+      <div class="edtitle">
+        <b id="itemTitle">Seite</b>
+        <span id="cropSource" class="pill">Automatisch erkannt</span>
+      </div>
+      <div class="edtools">
+        <button class="btn sm" id="autoDetect" type="button" title="Etikett auf der Seite neu suchen">Automatisch erkennen</button>
+        <button class="btn sm" id="fullPage" type="button" title="Die ganze Seite verwenden">Ganze Seite</button>
+        <div class="pager" id="pager" hidden>
+          <button class="btn sm icon" id="prevItem" type="button" aria-label="Vorheriges Etikett">‹</button>
+          <span id="pagerText" class="num">1 / 1</span>
+          <button class="btn sm icon" id="nextItem" type="button" aria-label="Nächstes Etikett">›</button>
+        </div>
+      </div>
+    </div>
+    <div class="stage" id="stage">
+      <div class="pagebox" id="pageBox">
+        <canvas id="pageCanvas"></canvas>
+        <div class="overlay" id="overlay"></div>
+      </div>
+      <div class="loading" id="loading" hidden><span class="spinner"></span><span id="loadingText">Wird geladen …</span></div>
+    </div>
+    <p class="hint">Gestrichelt: gefundene Blöcke, ein Klick wählt einen aus. Ziehen zeichnet einen eigenen Ausschnitt, an Ecken und Kanten lässt er sich anpassen.</p>
+  </section>
+
+  <aside class="side" aria-label="Einstellungen und Ergebnis">
+    <div class="panel result">
+      <div class="reshead">
+        <h2>Ergebnis</h2>
+        <span class="muted num" id="resultSize">100 × 150 mm</span>
+      </div>
+      <div class="labelwrap"><canvas id="resultCanvas"></canvas></div>
+      <p class="resinfo" id="resultInfo"></p>
+      <p class="warn" id="resultWarn" hidden></p>
+      <div class="actions">
+        <button class="btn primary big" id="download" type="button">PDF herunterladen</button>
+        <button class="btn big" id="print" type="button">Drucken</button>
+      </div>
+      <p class="fine" id="countInfo"></p>
+    </div>
+
+    <div class="panel">
+      <h2>Etikettenformat</h2>
+      <label class="field">
+        <span>Größe</span>
+        <select id="format">
+          <option value="100x150">100 × 150 mm (4 × 6″)</option>
+          <option value="102x152">102 × 152 mm</option>
+          <option value="104x159">104 × 159 mm (DYMO 4XL)</option>
+          <option value="105x148">105 × 148 mm (A6)</option>
+          <option value="62x100">62 × 100 mm (Brother QL)</option>
+          <option value="custom">Eigenes Format …</option>
+        </select>
+      </label>
+      <div class="row2" id="customRow" hidden>
+        <label class="field"><span>Breite (mm)</span><input id="customW" type="number" min="20" max="300" step="1" value="100"></label>
+        <label class="field"><span>Höhe (mm)</span><input id="customH" type="number" min="20" max="400" step="1" value="150"></label>
+      </div>
+      <div class="row2">
+        <label class="field">
+          <span>Drehung</span>
+          <select id="rotation">
+            <option value="auto">Automatisch</option>
+            <option value="0">0°</option>
+            <option value="90">90° rechts</option>
+            <option value="180">180°</option>
+            <option value="270">90° links</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Rand (mm)</span>
+          <input id="margin" type="number" min="0" max="20" step="0.5" value="2">
+        </label>
+      </div>
+      <label class="field">
+        <span>Größe des Inhalts</span>
+        <select id="scaleMode">
+          <option value="shrink">Originalgröße, nur verkleinern wenn nötig</option>
+          <option value="fit">Immer ans Etikett anpassen</option>
+          <option value="original">Immer 100 % (kann abgeschnitten werden)</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" id="remember"> <span>Ausschnitt für gleich aufgebaute Labels merken</span></label>
+      <details class="more">
+        <summary>Erweitert</summary>
+        <label class="check"><input type="checkbox" id="raster"> <span>Als Bild ausgeben (300 dpi) statt Vektor-PDF. Nur nötig, wenn der Drucker mit dem PDF Probleme macht.</span></label>
+      </details>
+    </div>
+
+    <details class="panel tips">
+      <summary>Tipps zum Drucken</summary>
+      <ul>
+        <li>Im Druckdialog den Etikettendrucker wählen und als Papiergröße dein Etikett einstellen (z. B. 100 × 150 mm bzw. 4 × 6″).</li>
+        <li>Skalierung auf <b>100 %</b> bzw. <b>Tatsächliche Größe</b> stellen, nicht „An Seite anpassen“.</li>
+        <li>Ränder auf „Keine“ stellen, falls der Dialog das anbietet.</li>
+        <li>Nach dem ersten Druck einmal prüfen, ob Barcode und Adresse gut lesbar sind.</li>
+      </ul>
+    </details>
+  </aside>
+
+  <section class="strip" id="strip" hidden aria-label="Alle Etiketten">
+    <div class="striphead">
+      <h2>Etiketten <span class="muted num" id="stripCount"></span></h2>
+      <div class="striptools">
+        <button class="btn sm" id="applyAll" type="button" title="Den aktuellen Ausschnitt für alle Seiten mit gleichem Seitenformat verwenden">Ausschnitt für alle übernehmen</button>
+        <button class="btn sm" id="duplicate" type="button" title="Noch ein Etikett aus derselben Seite ausschneiden">+ Weiteres Etikett von dieser Seite</button>
+      </div>
+    </div>
+    <div class="thumbs" id="thumbs"></div>
+  </section>
+</main>
+
+<div class="dropveil" id="dropVeil" hidden><div>Loslassen zum Hinzufügen</div></div>
+<div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>
