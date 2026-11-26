@@ -49,12 +49,11 @@ darf dabei **nur lesen**. Die Einrichtung ist einmalig.
    registrieren. Die Freischaltung des Kontos kann etwas dauern.
 2. Unter **Application Keys** einen Schlüsselsatz für **Production** anlegen. Sie erhalten
    **App ID (Client ID)** und **Cert ID (Client Secret)**.
-3. **Marketplace Account Deletion:** eBay schaltet Produktionsschlüssel erst frei, wenn Sie entweder
-   Benachrichtigungen über gelöschte eBay-Konten empfangen (dafür ist eine öffentlich erreichbare
-   Webadresse nötig) oder eine Ausnahme beantragen. Eine Ausnahme sieht eBay vor, wenn keine eBay-Daten
-   gespeichert werden. Ihre Rechnungen enthalten aber Käuferdaten, die Sie steuerrechtlich aufbewahren
-   müssen. Wählen Sie die Variante, die Ihren tatsächlichen Umgang mit den Daten richtig beschreibt.
-   Lehnt eBay die Ausnahme ab, lässt sich eine kleine Empfangsstelle für die Benachrichtigungen ergänzen.
+3. **Marketplace Account Deletion:** eBay schaltet Produktionsschlüssel erst frei, wenn Sie Meldungen über
+   gelöschte eBay-Konten empfangen oder eine Ausnahme beantragen. Die Ausnahme gibt es nur, wenn man
+   *keine* eBay-Daten speichert oder für eBay selbst arbeitet. Beides trifft hier nicht zu, denn Rechnungen
+   enthalten Käuferdaten und müssen aufbewahrt werden. Deshalb: Empfangsstelle einrichten, siehe
+   [eBay-Meldungen über gelöschte Konten](#ebay-meldungen-über-gelöschte-konten).
 4. Neben dem Production-Schlüssel auf **User Tokens** → **Get a Token from eBay via Your Application** →
    **Add eBay Redirect URL**. Dort eintragen:
    * *Your auth accepted URL*: eine beliebige eigene `https://`-Seite, z. B. Ihre Website. Dorthin schickt
@@ -62,6 +61,30 @@ darf dabei **nur lesen**. Die Einrichtung ist einmalig.
    * *Privacy policy URL*: die Datenschutzerklärung Ihrer Website.
 
    eBay zeigt danach den **RuName** an (eine Zeichenkette wie `Ihr_Name-IhrName-Tagesr-abcdefghi`).
+
+### eBay-Meldungen über gelöschte Konten
+
+eBay schickt allen Programmen mit API-Zugang Meldungen, wenn ein eBay-Konto gelöscht wird (laut eBay bis
+zu ca. 1.500 am Tag). Die Vorlage `deploy/ebay-kontoloeschung-worker.js` nimmt sie entgegen. Sie läuft
+kostenlos bei Cloudflare Workers (100.000 Anfragen am Tag frei) und braucht keinen eigenen Server.
+
+1. Einen Token ausdenken oder erzeugen: 32–80 Zeichen, nur Buchstaben, Ziffern, `_` und `-`.
+   Ihn in der Vorlage bei `VERIFICATION_TOKEN` eintragen.
+2. Auf [dash.cloudflare.com](https://dash.cloudflare.com) kostenlos registrieren. Unter **Workers & Pages**
+   einen neuen Worker anlegen („Hello World“-Vorlage), z. B. mit dem Namen `meinshop-ebay`, und **Deploy**
+   klicken.
+3. **Edit code**: den gesamten Code durch die Vorlage ersetzen und erneut **Deploy** klicken.
+4. Im Browser `https://meinshop-ebay.<ihr-name>.workers.dev/ebay` öffnen. Es muss „eBay-Empfangsstelle ist
+   bereit.“ erscheinen.
+5. Im eBay-Entwicklerportal unter **Alerts & Notifications → Marketplace Account Deletion**:
+   * Schalter *Exempted* **aus**.
+   * E-Mail für Störungsmeldungen eintragen.
+   * Endpoint: die Adresse aus Schritt 4, **mit** `/ebay` am Ende.
+   * Verification token: derselbe Token wie in Schritt 1.
+   * **Save**. eBay prüft die Adresse sofort. Danach **Send Test Notification**.
+
+Der Worker bestätigt jede Meldung. Rechnungen werden nicht gelöscht, denn sie unterliegen der gesetzlichen
+Aufbewahrungspflicht. Weitere Käuferdaten speichert das Programm nicht.
 
 ### 2. Konfiguration
 
