@@ -16,6 +16,7 @@ from pathlib import Path
 from . import formate
 from .konfiguration import EmailEinstellungen, Konfiguration
 from .modelle import GespeicherteRechnung
+from .netz import ssl_kontext
 from .vorlagen import werte_fuer_gespeicherte
 
 log = logging.getLogger(__name__)
@@ -102,7 +103,7 @@ class SmtpVersand:
         e = self.e
         if not e.smtp_server:
             raise VersandFehler("[email] smtp_server ist nicht angegeben")
-        kontext = ssl.create_default_context()
+        kontext = ssl_kontext()
         if e.sicherheit == "ssl":
             smtp: smtplib.SMTP = smtplib.SMTP_SSL(e.smtp_server, e.smtp_port, timeout=e.zeitlimit_sekunden,
                                                   context=kontext)

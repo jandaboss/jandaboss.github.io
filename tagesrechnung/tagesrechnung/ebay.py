@@ -34,6 +34,7 @@ from . import formate
 from .formate import auf_cent, zeitpunkt_lesen
 from .konfiguration import EbayEinstellungen
 from .modelle import Kunde, Position
+from .netz import ssl_kontext
 
 log = logging.getLogger(__name__)
 
@@ -77,7 +78,7 @@ def betrifft_rechnung(hinweis: str) -> bool:
 def _http(methode: str, url: str, kopf: dict[str, str], daten: bytes | None = None) -> tuple[int, bytes]:
     anfrage = urllib.request.Request(url, data=daten, headers=kopf, method=methode)
     try:
-        with urllib.request.urlopen(anfrage, timeout=60) as antwort:
+        with urllib.request.urlopen(anfrage, timeout=60, context=ssl_kontext()) as antwort:
             return antwort.status, antwort.read()
     except urllib.error.HTTPError as fehler:
         return fehler.code, fehler.read()

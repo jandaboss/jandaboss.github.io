@@ -65,6 +65,8 @@ def _parser() -> argparse.ArgumentParser:
                    help="zusätzlich noch nicht abgerechnete Bestellungen der TAGE Tage davor abrechnen")
     a.add_argument("--probelauf", action="store_true",
                    help="nichts versenden und nichts festschreiben; PDFs und E-Mails (.eml) in den Probelauf-Ordner")
+    a.add_argument("--ohne-abrechnen-ab", action="store_true", dest="ohne_abrechnen_ab",
+                   help="nur mit --probelauf: auch Bestellungen vor abrechnen_ab zeigen (zum Ausprobieren)")
 
     l = befehle.add_parser("liste", parents=[gemeinsam], help="erstellte Rechnungen anzeigen")
     l.add_argument("--offen", action="store_true", help="nur noch nicht zugestellte Rechnungen")
@@ -149,13 +151,17 @@ def _ausfuehren(args, konfig) -> int:
     if args.nachholen < 0:
         log.error("--nachholen darf nicht negativ sein")
         return 2
+    if args.ohne_abrechnen_ab and not args.probelauf:
+        log.error("--ohne-abrechnen-ab geht nur zusammen mit --probelauf")
+        return 2
     if not args.probelauf and not konfig.email.smtp_server:
         log.error("Konfiguration: [email] smtp_server fehlt (für eine Vorschau ohne Versand: --probelauf)")
         return 2
 
     if args.probelauf:
         log.info("PROBELAUF – es wird nichts versendet und das Rechnungsbuch bleibt unverändert")
-    bericht = ausfuehren(konfig, stichtag, nachholen_tage=args.nachholen, probelauf=args.probelauf)
+    bericht = ausfuehren(konfig, stichtag, nachholen_tage=args.nachholen, probelauf=args.probelauf,
+                         abrechnen_ab_beachten=not args.ohne_abrechnen_ab)
 
     log.info(
         "Fertig: %d Rechnung(en) erstellt, %d %s, %d Versandfehler, %d Datenfehler",

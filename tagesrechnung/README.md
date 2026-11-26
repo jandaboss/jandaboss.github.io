@@ -38,6 +38,41 @@ tagesrechnung ausfuehren -c config.beispiel.toml --datum 22.11.2026 --probelauf
 Im Ordner `probelauf/` liegen danach die Rechnungen als PDF und die E-Mails als `.eml`-Dateien
 (lassen sich mit Outlook, Thunderbird oder Apple Mail öffnen).
 
+## Einrichtung auf dem Mac
+
+1. **Python** ab Version 3.11 installieren: Installer von
+   [python.org/downloads/macos](https://www.python.org/downloads/macos/). Das vorinstallierte Python von macOS
+   ist zu alt.
+2. **Programmordner** `tagesrechnung` nach `~/tagesrechnung` kopieren, also in Ihren Benutzerordner. Bitte nicht
+   unter Dokumente, Schreibtisch, Downloads oder iCloud ablegen, denn dort darf der tägliche Lauf von macOS aus
+   nicht zugreifen.
+3. Die eigene **`config.toml`** in diesen Ordner legen (Vorlage: `config.ebay.beispiel.toml`).
+4. Im Terminal einrichten:
+   ```bash
+   cd ~/tagesrechnung
+   bash deploy/macos/einrichten.sh
+   ```
+   Das Skript installiert das Programm und speichert die eBay-Cert-ID und das E-Mail-Passwort im
+   **macOS-Schlüsselbund**, nicht in einer Datei.
+5. Ab jetzt alle Befehle über `./tagesrechnung.sh`, er holt die Passwörter aus dem Schlüsselbund:
+   ```bash
+   ./tagesrechnung.sh ebay-verbinden
+   ./tagesrechnung.sh ebay-pruefen --tage 14
+   ./tagesrechnung.sh testmail ihre@adresse.de
+   ./tagesrechnung.sh ausfuehren --probelauf --nachholen 14 --ohne-abrechnen-ab
+   open probelauf
+   ```
+6. **Täglichen Lauf einschalten** (23:55 Uhr; schläft der Mac, läuft er beim Aufwachen):
+   ```bash
+   bash deploy/macos/zeitplan.sh an        # aus: … aus · Stand: … status
+   ```
+   Das Protokoll steht in `tagesrechnung.log`.
+
+**Gmail als Absender:** Gmail verlangt ein *App-Passwort* statt Ihres normalen Passworts. Dafür muss im
+Google-Konto die Bestätigung in zwei Schritten aktiv sein. Dann unter *Google-Konto → Sicherheit →
+App-Passwörter* eines mit dem Namen „Tagesrechnung“ anlegen. SMTP-Einstellungen: `smtp.gmail.com`, Port `587`,
+`starttls`. Gesendete Rechnungen finden Sie im Gmail-Ordner „Gesendet“.
+
 ## eBay-Anbindung einrichten
 
 Das Programm holt die Bestellungen über die offizielle eBay-Schnittstelle (Sell Fulfillment API) und

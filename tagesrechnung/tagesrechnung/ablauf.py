@@ -48,6 +48,7 @@ def ausfuehren(
     probelauf: bool = False,
     versand: Versand | None = None,
     jetzt: datetime | None = None,
+    abrechnen_ab_beachten: bool = True,
 ) -> Bericht:
     """Erstellt und versendet die Rechnungen für alle Bestellungen vom ``stichtag``
     (und den ``nachholen_tage`` Tagen davor), die noch nicht abgerechnet sind.
@@ -59,7 +60,7 @@ def ausfuehren(
     zeitzone = konfig.speicher.zeitzone
     jetzt = (jetzt or datetime.now(zeitzone)).astimezone(zeitzone)
     von = stichtag - timedelta(days=nachholen_tage)
-    if konfig.rechnung.abrechnen_ab and von < konfig.rechnung.abrechnen_ab:
+    if abrechnen_ab_beachten and konfig.rechnung.abrechnen_ab and von < konfig.rechnung.abrechnen_ab:
         von = konfig.rechnung.abrechnen_ab
     pdf_ordner = konfig.speicher.probelauf if probelauf else konfig.speicher.archiv
     if versand is None:
