@@ -413,7 +413,7 @@ def test_ebay_beispielkonfiguration_ist_gueltig():
     konfig = laden(Path(__file__).parent.parent / "config.ebay.beispiel.toml")
     assert konfig.quelle.typ == "ebay" and konfig.quelle.ebay.umgebung == "produktion"
     assert konfig.quelle.ebay.token_datei.name == "ebay-zugang.json"
-    assert konfig.rechnung.zahlungsziel_tage == 0 and "bereits" in konfig.rechnung.zahlungshinweis
+    assert konfig.rechnung.zahlungsziel_tage == 0 and "über eBay abgewickelt" in konfig.rechnung.zahlungshinweis
     assert konfig.rechnung.abrechnen_ab == date(2026, 11, 24)
     assert konfig.rechnung.kleinunternehmer
 

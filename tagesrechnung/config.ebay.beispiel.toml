@@ -43,9 +43,10 @@ eine_rechnung_pro = "kunde"     # kauft jemand am selben Tag mehrmals, gibt es e
 preise_sind = "brutto"          # eBay-Preise sind Endpreise
 standard_ust_satz = 19          # nur relevant ohne Kleinunternehmerregelung
 
-# eBay-Bestellungen sind bei Rechnungsstellung schon bezahlt → kein Zahlungsziel
+# Bezahlt wird über eBay → kein Zahlungsziel. Bewusst nicht „bereits bezahlt“: Wer per Klarna-Rechnung
+# oder Ratenkauf zahlt, schuldet den Betrag noch Klarna.
 zahlungsziel_tage = 0
-zahlungshinweis = "Der Rechnungsbetrag von {betrag} wurde bereits über eBay bezahlt."
+zahlungshinweis = "Die Zahlung von {betrag} wird über eBay abgewickelt."
 schlusstext = "Vielen Dank für Ihren Einkauf!"
 einleitung = """{anrede},
 

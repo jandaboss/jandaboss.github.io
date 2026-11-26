@@ -141,6 +141,8 @@ tagesrechnung ausfuehren --nachholen 7 --probelauf
 * **Versandkosten, Rabatte, Versandrabatte und Preisanpassungen** werden als eigene Positionen
   aufgeführt. Bei gemischten Steuersätzen (`[ebay.ust_saetze]`) werden die Versandkosten anteilig
   aufgeteilt.
+* **Zahlungshinweis:** Die eBay-Vorlage schreibt „Die Zahlung wird über eBay abgewickelt“ statt „bereits
+  bezahlt“, weil Käufer mit Klarna-Rechnung oder Ratenkauf den Betrag zu diesem Zeitpunkt noch Klarna schulden.
 * **Rechnungsanschrift** ist die beim eBay-Konto des Käufers hinterlegte Adresse, ersatzweise die
   Lieferanschrift. Wünscht der Käufer eine andere Anschrift, siehe unten.
 * **Rücksendungen nach dem Rechnungsversand** erzeugen keine automatische Gutschrift. Diese bitte von Hand
