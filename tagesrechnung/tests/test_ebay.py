@@ -7,7 +7,7 @@ import stat
 import time
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from urllib.parse import parse_qs, quote, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urlsplit
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -39,12 +39,14 @@ def artikel(titel="Teeservice", preis="49.95", menge=1, sku="TS-100", **extra):
 
 def bestellung(nr="12-11111-11111", zeit="2026-11-22T08:41:12.000Z", positionen=None, versand="4.90",
                gesamt=None, zahlstatus="PAID", storno="NONE_REQUESTED", email=RELAIS, name="Erika Musterfrau",
-               benutzer="erika_m", land="DE", summen=None):
+               benutzer="erika_m", land="DE", summen=None, versandstatus=None):
     positionen = positionen if positionen is not None else [artikel()]
     if gesamt is None:
         gesamt = sum((Decimal(a["lineItemCost"]["value"]) for a in positionen), Decimal(0)) + Decimal(versand)
     adresse = {"addressLine1": "Beispielweg 5", "city": "Berlin", "postalCode": "10115", "countryCode": land}
+    extra = {"orderFulfillmentStatus": versandstatus} if versandstatus else {}
     return {
+        **extra,
         "orderId": nr,
         "creationDate": zeit,
         "orderPaymentStatus": zahlstatus,
@@ -62,10 +64,11 @@ def bestellung(nr="12-11111-11111", zeit="2026-11-22T08:41:12.000Z", positionen=
 
 
 class FalschesEbay:
-    """Bildet die beiden eBay-Endpunkte nach: OAuth-Token und getOrders."""
+    """Bildet die eBay-Endpunkte nach: OAuth-Token, getOrders und getShippingFulfillments."""
 
     def __init__(self, *bestellungen):
         self.bestellungen = list(bestellungen)
+        self.versand: dict[str, list[str]] = {}  # Bestellnummer → shippedDate je Sendung
         self.anfragen: list[tuple] = []
         self.gueltig: set[str] = set()
         self.nr = 0
@@ -106,7 +109,18 @@ class FalschesEbay:
             treffer = [b for b in self.bestellungen if start <= b["creationDate"] <= ende]
             return 200, json.dumps({"orders": treffer[offset:offset + limit], "total": len(treffer),
                                     "limit": limit, "offset": offset}).encode()
+        teile_pfad = teile.path.split("/")
+        if teile.path.startswith("/sell/fulfillment/v1/order/") and teile_pfad[-1] == "shipping_fulfillment":
+            assert methode == "GET" and len(teile_pfad) == 7
+            if kopf.get("Authorization", "").removeprefix("Bearer ") not in self.gueltig:
+                return 401, b'{"errors":[{"errorId":1001,"message":"Invalid access token"}]}'
+            sendungen = [{"fulfillmentId": f"F{i}", "shippedDate": d}
+                         for i, d in enumerate(self.versand.get(unquote(teile_pfad[5]), []))]
+            return 200, json.dumps({"fulfillments": sendungen, "total": len(sendungen)}).encode()
         return 404, b"{}"
+
+    def versandabfragen(self):
+        return [unquote(u.path.split("/")[5]) for u in self.abrufe() if u.path.endswith("/shipping_fulfillment")]
 
     def abrufe(self):
         return [urlsplit(u) for m, u, *_ in self.anfragen if "/sell/fulfillment/" in u]
@@ -126,14 +140,14 @@ def verbunden(projekt, server, text=""):
     return konfig
 
 
-def auswerten(b, text=""):
+def auswerten(b, text="", erst_nach_versand=False, versandzeit=None):
     from tagesrechnung.konfiguration import EbayEinstellungen
 
-    einst = EbayEinstellungen(client_id="x", ru_name="y", token_datei=None)
+    einst = EbayEinstellungen(client_id="x", ru_name="y", token_datei=None, erst_nach_versand=erst_nach_versand)
     for zeile in filter(None, text.splitlines()):
         sku, satz = zeile.split("=")
         einst.ust_saetze[sku.strip()] = Decimal(satz)
-    return ebay.auswerten(b, einst, BERLIN, Decimal("19"))
+    return ebay.auswerten(b, einst, BERLIN, Decimal("19"), versandzeit=versandzeit)
 
 
 # --- Verbinden und Schlüssel ----------------------------------------------------------------------
@@ -451,3 +465,104 @@ def test_cli_verbinden_fehler(projekt, server):
     projekt.extra["ebay"] = ""
     projekt.konfig()
     assert cli.main(["ebay-verbinden", "-c", str(projekt.config), "--adresse", "x"]) == 2
+
+
+# --- Erst nach dem Versand abrechnen (erst_nach_versand) ---------------------------------------------
+
+
+@pytest.mark.parametrize("versandstatus, grund", [
+    (None, "noch nicht versendet"),
+    ("NOT_STARTED", "noch nicht versendet"),
+    ("IN_PROGRESS", "teilweise versendet"),
+])
+def test_erst_nach_versand_wartet_auf_den_versand(versandstatus, grund):
+    b = auswerten(bestellung(versandstatus=versandstatus), erst_nach_versand=True)
+    assert not b.abrechenbar and not b.fehler
+    assert b.grund.startswith(grund)
+
+
+def test_ohne_schalter_wird_der_versand_nicht_abgewartet():
+    b = auswerten(bestellung(versandstatus="NOT_STARTED"))
+    assert b.abrechenbar
+    assert all(p.lieferdatum is None for p in b.positionen)
+
+
+def test_fehler_werden_schon_vor_dem_versand_gemeldet():
+    b = auswerten(bestellung(versandstatus="NOT_STARTED", email=""), erst_nach_versand=True)
+    assert b.fehler and "E-Mail" in b.grund
+
+
+def test_versandtag_wird_liefer_und_leistungsdatum():
+    versendet = datetime(2026, 11, 24, 0, 14)  # Ortszeit, wie EbayKonto.versandzeit sie liefert
+    b = auswerten(bestellung(versandstatus="FULFILLED"), erst_nach_versand=True, versandzeit=versendet)
+    assert b.abrechenbar and b.versandzeit == versendet
+    assert {p.lieferdatum for p in b.positionen} == {date(2026, 11, 24)}
+
+
+def test_versendet_ohne_versandtag_nimmt_das_bestelldatum():
+    b = auswerten(bestellung(versandstatus="FULFILLED"), erst_nach_versand=True)
+    assert b.abrechenbar
+    assert all(p.lieferdatum is None for p in b.positionen)
+
+
+def test_versandzeit_nimmt_die_letzte_sendung_in_ortszeit(projekt, server):
+    konfig = verbunden(projekt, server)
+    server.versand["12-00001/00001"] = ["2026-11-22T09:00:00.000Z", "2026-11-23T23:30:00.000Z"]
+    konto = ebay.EbayKonto(konfig.quelle.ebay)
+    assert konto.versandzeit("12-00001/00001", BERLIN) == datetime(2026, 11, 24, 0, 30)  # 23:30 UTC = 0:30 MEZ
+    assert konto.versandzeit("12-99999-99999", BERLIN) is None
+
+
+def test_tageslauf_rechnet_erst_nach_dem_versand_ab(projekt, server):
+    konfig = verbunden(projekt, server, "erst_nach_versand = true\n")
+    server.bestellungen = [
+        bestellung("12-00001-00001", "2026-11-21T09:00:00.000Z", versandstatus="FULFILLED"),
+        bestellung("12-00002-00002", "2026-11-22T10:00:00.000Z", versandstatus="NOT_STARTED", benutzer="max",
+                   email="9z8y7x@members.ebay.com", name="Max Mustermann"),
+    ]
+    server.versand["12-00001-00001"] = ["2026-11-22T14:00:00.000Z"]  # bestellt am 21., versendet am 22.
+
+    bericht = ausfuehren(konfig, TAG, nachholen_tage=7, versand=FalscherVersand(), jetzt=ABEND)
+    assert bericht.erfolgreich, bericht.datenfehler
+    assert bericht.erstellt == ["RE-2026-00001"]
+    assert server.versandabfragen() == ["12-00001-00001"]  # nur für versendete Bestellungen
+
+    # Max' Bestellung wird zwei Tage später versendet (kurz nach Mitternacht deutscher Zeit eingetragen)
+    server.bestellungen[1]["orderFulfillmentStatus"] = "FULFILLED"
+    server.versand["12-00002-00002"] = ["2026-11-23T23:30:00.000Z"]
+    bericht = ausfuehren(konfig, date(2026, 11, 24), nachholen_tage=7, versand=FalscherVersand(),
+                         jetzt=datetime(2026, 11, 24, 17, 0, tzinfo=BERLIN))
+    assert bericht.erstellt == ["RE-2026-00002"] and bericht.bereits_abgerechnet == 1
+
+    buch = Rechnungsbuch.oeffnen(konfig.speicher.datenbank)
+    try:
+        erika, max_ = buch.holen("RE-2026-00001"), buch.holen("RE-2026-00002")
+    finally:
+        buch.schliessen()
+    assert (erika.leistungsdatum, erika.rechnungsdatum) == (date(2026, 11, 22), TAG)
+    assert (max_.leistungsdatum, max_.rechnungsdatum) == (date(2026, 11, 24), date(2026, 11, 24))
+
+
+def test_cli_pruefen_zeigt_versandtag(projekt, server, capsys):
+    projekt.ebay("erst_nach_versand = true\n").konfig()
+    c = ["-c", str(projekt.config)]
+    assert cli.main(["ebay-verbinden", *c, "--adresse", f"https://example.github.io/?code={CODE_IN_URL}"]) == 0
+    jetzt = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    server.bestellungen = [
+        bestellung("12-00001-00001", jetzt, versandstatus="FULFILLED"),
+        bestellung("12-00002-00002", jetzt, versandstatus="NOT_STARTED", benutzer="max"),
+    ]
+    server.versand["12-00001-00001"] = [jetzt]
+    capsys.readouterr()
+    assert cli.main(["ebay-pruefen", *c]) == 0
+    ausgabe = capsys.readouterr().out
+    heute = datetime.now(BERLIN).strftime("%d.%m.%Y")
+    assert f"wird abgerechnet (versendet {heute})" in ausgabe
+    assert "noch nicht versendet" in ausgabe
+
+
+def test_beispielkonfiguration_erst_nach_versand(projekt):
+    assert projekt.ebay().konfig().quelle.ebay.erst_nach_versand is False
+    assert projekt.ebay("erst_nach_versand = true\n").konfig().quelle.ebay.erst_nach_versand is True
+    with pytest.raises(KonfigurationsFehler, match="erst_nach_versand"):
+        projekt.ebay('erst_nach_versand = "ja"\n').konfig()

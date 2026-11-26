@@ -40,6 +40,7 @@ class Position:
     ust_satz: Decimal
     einheit: str = ""
     artikelnummer: str = ""
+    lieferdatum: date | None = None  # Versandtag, falls bekannt (sonst gilt das Bestelldatum)
 
     @property
     def gesamt(self) -> Decimal:
@@ -52,6 +53,7 @@ class Bestellung:
     zeit: datetime
     kunde: Kunde
     positionen: list[Position] = field(default_factory=list)
+    lieferdatum: date | None = None  # Versandtag, falls bekannt
 
 
 @dataclass(frozen=True)

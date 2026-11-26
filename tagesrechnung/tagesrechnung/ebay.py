@@ -24,7 +24,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta, timezone
 from datetime import time as uhrzeit
 from decimal import Decimal, InvalidOperation
@@ -234,6 +234,19 @@ class EbayKonto:
             if not seite or len(alle) >= int(daten.get("total", 0)):
                 return alle
 
+    def versandzeit(self, bestellnummer: str, zeitzone: ZoneInfo) -> datetime | None:
+        """Wann die Bestellung bei eBay als versendet eingetragen wurde (Ortszeit); bei mehreren
+        Sendungen die letzte. None, wenn eBay keinen Versand kennt."""
+        pfad = urllib.parse.quote(bestellnummer, safe="")
+        daten = self._abrufen(f"{self._api}/sell/fulfillment/v1/order/{pfad}/shipping_fulfillment")
+        zeiten = []
+        for sendung in daten.get("fulfillments") or []:
+            try:
+                zeiten.append(zeitpunkt_lesen((sendung or {}).get("shippedDate"), zeitzone))
+            except ValueError:
+                continue
+        return max(zeiten) if zeiten else None
+
     def _abrufen(self, url: str) -> dict:
         for versuch in (1, 2):
             schluessel = self.zugangsschluessel(erneuern=versuch == 2)
@@ -285,6 +298,7 @@ class EbayBestellung:
     grund: str = ""  # warum (noch) nicht abrechenbar
     fehler: bool = False  # True: muss von Hand geklärt werden
     hinweis: str = ""  # Nachricht des Käufers beim Kauf
+    versandzeit: datetime | None = None  # wann bei eBay als versendet eingetragen (nur bei erst_nach_versand)
 
     @property
     def abrechenbar(self) -> bool:
@@ -306,9 +320,15 @@ def _betrag(daten: dict | None, feld: str) -> Decimal | None:
 def auswerten(
     bestellung: dict, einst: EbayEinstellungen, zeitzone: ZoneInfo, standard_ust_satz: Decimal,
     freigegeben: frozenset[str] | set[str] = frozenset(),
+    versandzeit: datetime | None = None,
 ) -> EbayBestellung:
     """``freigegeben``: Bestellnummern, für die eine Rechnungsanschrift eingetragen oder die
-    ausdrücklich freigegeben wurden – Käuferhinweise halten sie nicht mehr an."""
+    ausdrücklich freigegeben wurden – Käuferhinweise halten sie nicht mehr an.
+
+    ``versandzeit``: wann die Bestellung bei eBay als versendet eingetragen wurde (Ortszeit). Nur bei
+    ``erst_nach_versand`` von Bedeutung: dann wird erst nach dem Versand abgerechnet, mit dem Versandtag
+    als Liefer-/Leistungsdatum. Fehler in den Bestelldaten werden trotzdem schon vorher gemeldet,
+    damit Zeit bleibt, sie zu klären."""
     nummer = str(bestellung.get("orderId") or "?")
     kaeufer_daten = bestellung.get("buyer") or {}
     registriert = kaeufer_daten.get("buyerRegistrationAddress") or {}
@@ -359,6 +379,21 @@ def auswerten(
         ergebnis.positionen = _positionen(bestellung, nummer, ergebnis.zeit, kunde, einst, standard_ust_satz)
     except ValueError as e:
         ergebnis.grund, ergebnis.fehler = str(e), True
+        return ergebnis
+
+    if einst.erst_nach_versand:
+        versandstatus = str(bestellung.get("orderFulfillmentStatus") or "")
+        if versandstatus != "FULFILLED":
+            ergebnis.positionen = []
+            ergebnis.grund = ("teilweise versendet – wird nach dem Versand abgerechnet" if versandstatus == "IN_PROGRESS"
+                              else "noch nicht versendet – wird nach dem Versand abgerechnet")
+            return ergebnis
+        if versandzeit is None:
+            log.warning("eBay-Bestellung %s ist versendet, aber eBay nennt keinen Versandtag – "
+                        "Liefer-/Leistungsdatum ist das Bestelldatum", nummer)
+        else:
+            ergebnis.versandzeit = versandzeit
+            ergebnis.positionen = [replace(p, lieferdatum=versandzeit.date()) for p in ergebnis.positionen]
     return ergebnis
 
 
@@ -535,7 +570,13 @@ def abrufen(
         return []
     bestellungen = konto.bestellungen(*zeitraum)
     _freigabe_pruefen(konto)
-    return [auswerten(b, einst, zeitzone, standard_ust_satz, freigegeben) for b in bestellungen]
+    ergebnisse = []
+    for b in bestellungen:
+        versandzeit = None
+        if einst.erst_nach_versand and b.get("orderFulfillmentStatus") == "FULFILLED" and b.get("orderId"):
+            versandzeit = konto.versandzeit(str(b["orderId"]), zeitzone)
+        ergebnisse.append(auswerten(b, einst, zeitzone, standard_ust_satz, freigegeben, versandzeit))
+    return ergebnisse
 
 
 def _freigabe_pruefen(konto: EbayKonto) -> None:

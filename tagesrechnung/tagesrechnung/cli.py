@@ -357,12 +357,13 @@ def _ebay_pruefen(args, konfig) -> int:
     print(f"{'Bestellung':<16}  {'Datum':<16}  {'Käufer':<24}  {'Betrag':>11}  {'E-Mail':<6}  Status")
     fehler = False
     for b in sorted(bestellungen, key=lambda b: b.zeit):
+        versendet = f" (versendet {formate.datum(b.versandzeit.date())})" if b.versandzeit else ""
         if b.nummer in abgerechnet:
             status = f"abgerechnet ({abgerechnet[b.nummer]})"
         elif b.abrechenbar and b.nummer in eingetragen:
-            status = f"wird abgerechnet an: {eingetragen[b.nummer].beschreibung()}"
+            status = f"wird abgerechnet{versendet} an: {eingetragen[b.nummer].beschreibung()}"
         elif b.abrechenbar:
-            status = "wird abgerechnet"
+            status = f"wird abgerechnet{versendet}"
         elif b.fehler:
             status, fehler = f"FEHLER: {b.grund}", True
         else:

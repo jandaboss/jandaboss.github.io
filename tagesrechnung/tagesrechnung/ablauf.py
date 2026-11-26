@@ -142,6 +142,12 @@ def ausfuehren(
     return bericht
 
 
+def _leistungsdatum(gruppe: list[Bestellung]) -> date:
+    """Versandtag, falls bekannt (bei mehreren Bestellungen der letzte), sonst das Bestelldatum."""
+    versandtage = [b.lieferdatum for b in gruppe if b.lieferdatum]
+    return max(versandtage) if versandtage else gruppe[0].zeit.date()
+
+
 def _rechnung_anlegen(
     buch: Rechnungsbuch,
     konfig: Konfiguration,
@@ -171,7 +177,7 @@ def _rechnung_anlegen(
             rechnung = Rechnung(
                 nummer=nummer,
                 rechnungsdatum=rechnungsdatum,
-                leistungsdatum=gruppe[0].zeit.date(),
+                leistungsdatum=_leistungsdatum(gruppe),
                 faellig=rechnungsdatum + timedelta(days=einst.zahlungsziel_tage),
                 kunde=gruppe[0].kunde,
                 bestellungen=tuple(gruppe),

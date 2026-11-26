@@ -75,6 +75,8 @@ client_secret_env = "TAGESRECHNUNG_EBAY_SECRET"
 token_datei = "ebay-zugang.json"     # hier speichert ebay-verbinden die Freigabe (vertraulich!)
 umgebung = "produktion"              # "sandbox" für eBays Testumgebung
 nur_bezahlte = true                  # erst abrechnen, wenn der Käufer bezahlt hat
+erst_nach_versand = false            # true: erst abrechnen, wenn bei eBay „versendet“ eingetragen ist;
+                                     #       Liefer-/Leistungsdatum ist dann der Versandtag
 versandkosten_text = "Versandkosten"
 
 # Artikel mit abweichendem Steuersatz, nach eBay-Bestandseinheit (SKU). Sonst gilt standard_ust_satz.

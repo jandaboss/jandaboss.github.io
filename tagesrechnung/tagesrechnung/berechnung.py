@@ -32,8 +32,10 @@ def bestellungen_bilden(positionen: Iterable[Position]) -> tuple[list[Bestellung
         if len(tage) > 1:
             fehler.append(f"Bestellung {nummer}: Positionen haben verschiedene Bestelldaten – Bestellung übersprungen")
             continue
+        lieferdaten = [p.lieferdatum for p in liste if p.lieferdatum]
         bestellungen.append(
-            Bestellung(nummer=nummer, zeit=min(p.bestellzeit for p in liste), kunde=liste[0].kunde, positionen=liste)
+            Bestellung(nummer=nummer, zeit=min(p.bestellzeit for p in liste), kunde=liste[0].kunde, positionen=liste,
+                       lieferdatum=max(lieferdaten) if lieferdaten else None)
         )
     bestellungen.sort(key=lambda b: (b.zeit, b.nummer))
     return bestellungen, fehler

@@ -62,11 +62,13 @@ Im Ordner `probelauf/` liegen danach die Rechnungen als PDF und die E-Mails als 
    ./tagesrechnung.sh ausfuehren --probelauf --nachholen 14 --ohne-abrechnen-ab
    open probelauf
    ```
-6. **Täglichen Lauf einschalten** (23:55 Uhr; schläft der Mac, läuft er beim Aufwachen):
+6. **Täglichen Lauf einschalten** (17:00 Uhr; schläft der Mac, läuft er beim Aufwachen):
    ```bash
    bash deploy/macos/zeitplan.sh an        # aus: … aus · Stand: … status
    ```
-   Das Protokoll steht in `tagesrechnung.log`.
+   Andere Uhrzeit: `TAGESRECHNUNG_STUNDE=23 TAGESRECHNUNG_MINUTE=55 bash deploy/macos/zeitplan.sh an`.
+   Der Lauf holt alle noch nicht abgerechneten Bestellungen der letzten 10 Tage nach
+   (`TAGESRECHNUNG_NACHHOLEN`). Das Protokoll steht in `tagesrechnung.log`.
 
 **Gmail als Absender:** Gmail verlangt ein *App-Passwort* statt Ihres normalen Passworts. Dafür muss im
 Google-Konto die Bestätigung in zwei Schritten aktiv sein. Dann unter *Google-Konto → Sicherheit →
@@ -167,6 +169,12 @@ tagesrechnung ausfuehren --nachholen 7 --probelauf
 | storniert, Storno beantragt oder voll erstattet | keine Rechnung                                                |
 | teilweise erstattet                          | wird gemeldet – bitte von Hand abrechnen                         |
 | Summe passt nicht zum eBay-Gesamtbetrag      | wird gemeldet statt mit falschem Betrag abgerechnet              |
+| noch nicht versendet (nur mit `erst_nach_versand = true`) | wartet; wird abgerechnet, sobald bei eBay „versendet“ eingetragen ist |
+
+Mit `erst_nach_versand = true` im Abschnitt `[ebay]` ist das **Liefer-/Leistungsdatum der Versandtag**,
+also der Tag, an dem die Bestellung bei eBay als versendet eingetragen wurde (bei mehreren Sendungen
+der letzte). Ohne diesen Schalter gilt das Bestelldatum. Fehler in den Bestelldaten (z. B. ein
+Käuferhinweis zur Rechnungsanschrift) werden schon vor dem Versand gemeldet, damit Zeit zum Klären bleibt.
 
 * **E-Mail-Adresse:** eBay gibt statt der echten Adresse eine verschlüsselte Adresse
   (`…@members.ebay.com`) heraus und leitet die Mail samt PDF an den Käufer weiter. eBay liefert diese

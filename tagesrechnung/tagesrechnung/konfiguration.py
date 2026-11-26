@@ -126,6 +126,9 @@ class EbayEinstellungen:
     client_secret_env: str = "TAGESRECHNUNG_EBAY_SECRET"
     umgebung: str = "produktion"  # "produktion" oder "sandbox"
     nur_bezahlte: bool = True
+    # True: erst abrechnen, wenn die Bestellung bei eBay als versendet eingetragen ist;
+    # Liefer-/Leistungsdatum ist dann der Versandtag
+    erst_nach_versand: bool = False
     versandkosten_text: str = "Versandkosten"
     ust_saetze: dict[str, Decimal] = field(default_factory=dict)  # SKU → abweichender Steuersatz
 
@@ -429,6 +432,7 @@ def _ebay(l: _Leser, basis: Path) -> EbayEinstellungen:
         client_secret_env=l.text("client_secret_env", "TAGESRECHNUNG_EBAY_SECRET"),
         umgebung=l.auswahl("umgebung", "produktion", ("produktion", "sandbox")),
         nur_bezahlte=l.schalter("nur_bezahlte", True),
+        erst_nach_versand=l.schalter("erst_nach_versand", False),
         versandkosten_text=l.text("versandkosten_text", "Versandkosten"),
         ust_saetze=saetze,
     )
