@@ -159,6 +159,24 @@ class Rechnungsbuch:
         )
         return nummer
 
+    def nummernkreise(self) -> dict[int, int]:
+        """Nummernkreis (Jahr bzw. 0) → zuletzt vergebene laufende Nummer."""
+        return dict(self._db.execute("SELECT kreis, letzte_nummer FROM nummernkreise ORDER BY kreis").fetchall())
+
+    def letzte_nummer_setzen(self, kreis: int, nummer: int) -> None:
+        """Schließt an bisherige Rechnungen an (z. B. aus eBay): die nächste Rechnung bekommt ``nummer + 1``.
+        Zurücksetzen ist nicht möglich, weil sonst Nummern doppelt vergeben würden."""
+        with self.transaktion():
+            zeile = self._db.execute("SELECT letzte_nummer FROM nummernkreise WHERE kreis = ?", (kreis,)).fetchone()
+            if zeile and nummer < zeile[0]:
+                raise ValueError(f"Im Nummernkreis ist bereits die Nummer {zeile[0]} vergeben – zurücksetzen würde "
+                                 "doppelte Rechnungsnummern erzeugen")
+            self._db.execute(
+                "INSERT INTO nummernkreise (kreis, letzte_nummer) VALUES (?, ?) "
+                "ON CONFLICT(kreis) DO UPDATE SET letzte_nummer = excluded.letzte_nummer",
+                (kreis, nummer),
+            )
+
     def eintragen(self, rechnung: Rechnung, pdf_datei: str, erstellt_am: datetime) -> None:
         s = rechnung.summen
         self._db.execute(

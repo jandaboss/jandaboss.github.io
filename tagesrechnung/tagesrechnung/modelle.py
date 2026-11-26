@@ -21,9 +21,11 @@ class Kunde:
     ort: str = ""
     land: str = ""
     ust_idnr: str = ""
+    name_drucken: bool = True  # False: Rechnung nur an die Firma, Name nur für Anrede/E-Mail
 
     def anschrift(self) -> list[str]:
-        zeilen = [self.firma, self.name, self.strasse, f"{self.plz} {self.ort}".strip(), self.land]
+        name = self.name if self.name_drucken else ""
+        zeilen = [self.firma, name, self.strasse, f"{self.plz} {self.ort}".strip(), self.land]
         return [z for z in zeilen if z]
 
 

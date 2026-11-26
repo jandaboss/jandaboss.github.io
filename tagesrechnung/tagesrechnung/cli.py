@@ -36,6 +36,9 @@ eBay (einmalig verbinden, dann prüfen):
 Rechnung auf eine andere Anschrift (z. B. auf Wunsch des Käufers auf seine Firma):
   python -m tagesrechnung anschrift 12-34567-89012 --firma "Beispiel GmbH" \\
       --strasse "Musterstr. 1" --plz 70191 --ort Stuttgart
+
+An bisherige Rechnungsnummern anschließen (letzte Rechnung war 2026-250):
+  python -m tagesrechnung nummernkreis --letzte 250
 """
 
 
@@ -77,7 +80,8 @@ def _parser() -> argparse.ArgumentParser:
                            help="abweichende Rechnungsanschrift für eine Bestellung eintragen")
     a.add_argument("bestellnummer")
     a.add_argument("--firma", default="", help="Firmenname, z. B. \"Beispiel GmbH\"")
-    a.add_argument("--name", help="Ansprechpartner (ohne Angabe bleibt der Name des Käufers stehen)")
+    a.add_argument("--name", help="Ansprechpartner auf der Rechnung (ohne Angabe: bei --firma nur die Firma, "
+                                  "sonst der Name des Käufers)")
     a.add_argument("--strasse", default="")
     a.add_argument("--plz", default="")
     a.add_argument("--ort", default="")
@@ -85,6 +89,12 @@ def _parser() -> argparse.ArgumentParser:
     a.add_argument("--ust-idnr", default="", dest="ust_idnr", help="USt-IdNr. des Kunden, falls gewünscht")
     a.add_argument("--wie-bestellt", action="store_true",
                    help="keine andere Anschrift – Bestellung trotz Käuferhinweis normal abrechnen")
+
+    n = befehle.add_parser("nummernkreis", parents=[gemeinsam],
+                           help="Rechnungsnummern anzeigen oder an bisherige Rechnungen anschließen")
+    n.add_argument("--letzte", type=int, metavar="NUMMER",
+                   help="laufende Nummer Ihrer letzten bisherigen Rechnung, z. B. 250 für „2026-250“")
+    n.add_argument("--jahr", type=int, help="Jahr des Nummernkreises (Standard: aktuelles Jahr)")
 
     e = befehle.add_parser("ebay-pruefen", parents=[gemeinsam],
                            help="eBay-Bestellungen anzeigen und prüfen, ohne etwas abzurechnen")
@@ -124,6 +134,8 @@ def main(argv: list[str] | None = None) -> int:
         return _ebay_pruefen(args, konfig)
     if args.befehl == "anschrift":
         return _anschrift(args, konfig)
+    if args.befehl == "nummernkreis":
+        return _nummernkreis(args, konfig)
     return _testmail(args, konfig)
 
 
@@ -192,6 +204,46 @@ def _testmail(args, konfig) -> int:
         log.error("Testmail fehlgeschlagen: %s", fehler)
         return 1
     log.info("Testmail an %s versendet", args.empfaenger)
+    return 0
+
+
+def _nummernkreis(args, konfig) -> int:
+    einst = konfig.rechnung
+    jahr = args.jahr or datetime.now(konfig.speicher.zeitzone).year
+    pro_jahr = einst.nummernkreis_pro_jahr
+
+    def nummer(kreis: int, laufend: int) -> str:
+        return einst.nummer_format.format(jahr=kreis or jahr, nummer=laufend)
+
+    if args.letzte is not None:
+        if args.letzte < 0:
+            log.error("--letzte darf nicht negativ sein")
+            return 2
+        buch = Rechnungsbuch.oeffnen(konfig.speicher.datenbank)
+        try:
+            buch.letzte_nummer_setzen(jahr if pro_jahr else 0, args.letzte)
+        except ValueError as fehler:
+            log.error("%s", fehler)
+            return 2
+        finally:
+            buch.schliessen()
+        log.info("Gespeichert: letzte bisherige Rechnung %s", nummer(jahr if pro_jahr else 0, args.letzte))
+
+    kreise: dict[int, int] = {}
+    if konfig.speicher.datenbank.is_file():
+        buch = Rechnungsbuch.oeffnen(konfig.speicher.datenbank, nur_kopie=True)
+        try:
+            kreise = buch.nummernkreise()
+        finally:
+            buch.schliessen()
+    aktuell = jahr if pro_jahr else 0
+    for kreis, letzte in kreise.items():
+        titel = str(kreis) if kreis else "jahresübergreifend"
+        print(f"{titel}: zuletzt vergeben {nummer(kreis, letzte)}, "
+              f"nächste Rechnung {nummer(kreis, max(letzte + 1, einst.startnummer))}")
+    if aktuell not in kreise:
+        titel = str(aktuell) if aktuell else "jahresübergreifend"
+        print(f"{titel}: noch keine Rechnung, erste Rechnung wird {nummer(aktuell, einst.startnummer)}")
     return 0
 
 

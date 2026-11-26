@@ -28,7 +28,10 @@ bic = ""
 # Rechnungen
 # ---------------------------------------------------------------------------------------------
 [rechnung]
-nummer_format = "RE-{jahr}-{nummer:05d}"
+# Rechnungsnummer: Jahr und laufende Nummer im Jahr, z. B. 2026-251. Jedes Jahr beginnt wieder bei 1.
+# Hatten Sie bisher schon Rechnungen (z. B. von eBay bis 2026-250), einmalig anschließen mit:
+#   tagesrechnung nummernkreis --letzte 250
+nummer_format = "{jahr}-{nummer}"
 nummernkreis_pro_jahr = true
 startnummer = 1
 
@@ -44,7 +47,7 @@ standard_ust_satz = 19          # nur relevant ohne Kleinunternehmerregelung
 zahlungsziel_tage = 0
 zahlungshinweis = "Der Rechnungsbetrag von {betrag} wurde bereits über eBay bezahlt."
 schlusstext = "Vielen Dank für Ihren Einkauf!"
-einleitung = """Guten Tag {name},
+einleitung = """{anrede},
 
 vielen Dank für Ihren Einkauf bei eBay. Hiermit erhalten Sie die Rechnung zu Ihrer Bestellung:"""
 

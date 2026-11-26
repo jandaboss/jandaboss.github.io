@@ -13,7 +13,8 @@ Dateiformat::
     strasse = "Musterstraße 1"
     plz = "70191"
     ort = "Stuttgart"
-    # name = "…"       ohne Angabe bleibt der Name des Käufers stehen
+    # name = "…"       Ansprechpartner; ohne Angabe steht bei einer Firma nur die Firma
+    #                  auf der Rechnung, sonst der Name des Käufers
     # ust_idnr = "…"
 
     ["12-34567-89012"]
@@ -40,7 +41,7 @@ class AnschriftenFehler(Exception):
 class Anschrift:
     wie_bestellt: bool = False
     firma: str = ""
-    name: str | None = None  # None: Name des Käufers beibehalten
+    name: str | None = None  # None: bei Firma kein Name, sonst Name des Käufers; "": kein Name
     strasse: str = ""
     plz: str = ""
     ort: str = ""
@@ -55,7 +56,9 @@ class Anschrift:
             # eigene Rechnung, nicht mit anderen Bestellungen des Käufers zusammenfassen
             schluessel=f"{kunde.schluessel}#{bestellnummer}",
             firma=self.firma,
-            name=kunde.name if self.name is None else self.name,
+            # Der Name des Käufers bleibt für Anrede und E-Mail erhalten, auch wenn er nicht gedruckt wird
+            name=self.name or kunde.name,
+            name_drucken=bool(self.name) or (self.name is None and not self.firma),
             strasse=self.strasse,
             plz=self.plz,
             ort=self.ort,
@@ -99,8 +102,8 @@ def laden(pfad: Path | None) -> dict[str, Anschrift]:
 
 
 def _pruefen(a: Anschrift, wo: str) -> None:
-    if not (a.firma or a.name):
-        raise AnschriftenFehler(f"{wo}: firma oder name angeben")
+    if not a.firma and a.name == "":
+        raise AnschriftenFehler(f"{wo}: ohne firma muss ein Name auf der Rechnung stehen")
     fehlend = [f for f in ("strasse", "plz", "ort") if not getattr(a, f)]
     if fehlend:
         raise AnschriftenFehler(f"{wo}: es fehlt {', '.join(fehlend)}")

@@ -217,7 +217,9 @@ Bestellung dann an, statt die Rechnung an die falsche Anschrift zu schicken, und
 Auch `ebay-pruefen` zeigt den Hinweis an. Andere Hinweise („bitte als Geschenk verpacken“) halten nichts
 auf.
 
-Gewünschte Anschrift eintragen (der Name des Käufers bleibt als Ansprechpartner stehen):
+Gewünschte Anschrift eintragen. Bei einer Firma steht nur die Firma auf der Rechnung, die Rechnung beginnt
+mit „Sehr geehrte Damen und Herren“. Mit `--name "…"` lässt sich ein Ansprechpartner ergänzen. Die E-Mail
+geht weiterhin über eBay an den Käufer und spricht ihn mit Namen an.
 
 ```bash
 tagesrechnung anschrift 12-34567-89012 --firma "Beispiel GmbH" --strasse "Musterstr. 1" --plz 70191 --ort Stuttgart
@@ -237,6 +239,20 @@ Befehl. Die bestehende Rechnung muss dann von Hand korrigiert werden.
 Angehaltene Bestellungen holt der tägliche Lauf mit `--nachholen 7` noch bis zu 7 Tage lang nach. Danach
 bitte mit `--datum` gezielt abrechnen.
 
+## Rechnungsnummern
+
+Das Programm vergibt die Nummern lückenlos und fortlaufend, standardmäßig mit dem Jahr davor
+(`nummer_format = "{jahr}-{nummer}"` → 2026-1, 2026-2, …). Am 1. Januar beginnt die Zählung wieder bei 1.
+
+**Umstieg von bisherigen Rechnungen** (z. B. eBays Rechnungsnummern bis 2026-250): einmalig festlegen, an
+welche Nummer das Programm anschließt, und die bisherige Nummerierung abschalten. Sonst bekämen Bestellungen
+zwei verschiedene Rechnungsnummern.
+
+```bash
+tagesrechnung nummernkreis --letzte 250    # nächste Rechnung: 2026-251, im Jahr 2027 wieder ab 2027-1
+tagesrechnung nummernkreis                 # aktuellen Stand anzeigen
+```
+
 ## Befehle
 
 ```bash
@@ -250,6 +266,7 @@ tagesrechnung testmail ich@example.com      # SMTP-Einstellungen prüfen
 tagesrechnung ebay-verbinden                # einmalig: Programm mit dem eBay-Konto verbinden
 tagesrechnung ebay-pruefen --tage 14        # eBay-Bestellungen ansehen, ohne abzurechnen
 tagesrechnung anschrift NR --firma … --strasse … --plz … --ort …   # abweichende Rechnungsanschrift
+tagesrechnung nummernkreis --letzte 250     # an bisherige Rechnungsnummern anschließen
 ```
 
 Alle Befehle akzeptieren `-c pfad/zur/config.toml`, `--logdatei datei.log` und `-v`.

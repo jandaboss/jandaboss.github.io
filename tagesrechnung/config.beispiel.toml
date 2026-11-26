@@ -48,9 +48,10 @@ zahlungsziel_tage = 14          # 0 = kein Zahlungsziel (z. B. wenn bereits beza
 # damit nicht rückwirkend Rechnungen für alte Bestellungen verschickt werden.
 # abrechnen_ab = 2026-11-24
 
-# Texte auf der Rechnung. Platzhalter: {name} {nummer} {datum} {leistungsdatum} {faellig}
-# {betrag} {firma} {bestellnummern}
-einleitung = """Guten Tag {name},
+# Texte auf der Rechnung. Platzhalter: {anrede} {name} {nummer} {datum} {leistungsdatum} {faellig}
+# {betrag} {firma} {bestellnummern}. {anrede} ist „Guten Tag Vorname Nachname“ bzw. bei Rechnungen
+# nur an eine Firma „Sehr geehrte Damen und Herren“.
+einleitung = """{anrede},
 
 vielen Dank für Ihre Bestellung. Hiermit stellen wir Ihnen folgende Lieferungen und Leistungen in Rechnung:"""
 zahlungshinweis = "Bitte überweisen Sie den Rechnungsbetrag von {betrag} bis zum {faellig} unter Angabe der Rechnungsnummer {nummer} auf das unten genannte Konto."

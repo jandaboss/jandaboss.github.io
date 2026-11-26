@@ -66,7 +66,7 @@ def test_eintragen_und_laden(tmp_path):
     "inhalt, meldung",
     [
         ('["1"]\nfirma = "X GmbH"\nplz = "1"\nort = "Y"\n', "es fehlt strasse"),
-        ('["1"]\nstrasse = "A"\nplz = "1"\nort = "Y"\n', "firma oder name"),
+        ('["1"]\nname = ""\nstrasse = "A"\nplz = "1"\nort = "Y"\n', "ohne firma muss ein Name"),
         ('["1"]\nfirma = "X"\nstrasse = "A"\nplz = 70191\nort = "Y"\n', "Text in Anführungszeichen"),
         ('["1"]\nfirma = "X"\nstrase = "A"\n', "unbekannte Angabe 'strase'"),
         ('["1"\n', "ungültiges Format"),
@@ -79,14 +79,23 @@ def test_fehlerhafte_datei(tmp_path, inhalt, meldung):
         anschriften.laden(pfad)
 
 
-def test_name_bleibt_ohne_angabe_erhalten():
+def test_wer_auf_der_rechnung_steht():
+    from dataclasses import replace
+
     from tagesrechnung.modelle import Kunde
 
     kunde = Kunde(schluessel="ebay:erika", kunden_nr="", name="Erika Musterfrau", email="x@members.ebay.com",
                   strasse="Privatweg 1", plz="10115", ort="Berlin")
+    # Firma ohne Ansprechpartner: nur die Firma – der Name bleibt für Anrede und E-Mail erhalten
     neu = FIRMA.anwenden(kunde, "12-1")
-    assert neu.anschrift() == ["Beispiel Facility GmbH", "Erika Musterfrau", "Musterallee 80-82", "70191 Stuttgart"]
-    assert neu.email == kunde.email and neu.schluessel == "ebay:erika#12-1"
+    assert neu.anschrift() == ["Beispiel Facility GmbH", "Musterallee 80-82", "70191 Stuttgart"]
+    assert neu.name == "Erika Musterfrau" and neu.email == kunde.email and neu.schluessel == "ebay:erika#12-1"
+    # Firma mit ausdrücklichem Ansprechpartner
+    mit = replace(FIRMA, name="Max Kontakt").anwenden(kunde, "12-1")
+    assert mit.anschrift() == ["Beispiel Facility GmbH", "Max Kontakt", "Musterallee 80-82", "70191 Stuttgart"]
+    # Nur andere Adresse, keine Firma: der Käufer steht weiter darauf
+    privat = anschriften.Anschrift(strasse="Neuer Weg 2", plz="80331", ort="München").anwenden(kunde, "12-1")
+    assert privat.anschrift() == ["Erika Musterfrau", "Neuer Weg 2", "80331 München"]
 
 
 # --- eBay-Käuferhinweise -----------------------------------------------------------------------------
@@ -148,9 +157,12 @@ def test_ebay_bestellung_mit_firmenwunsch(projekt, server):
     pypdf = pytest.importorskip("pypdf")
     text = pypdf.PdfReader(konfig.speicher.archiv / "2026" / "RE-2026-00002.pdf").pages[0].extract_text()
     assert "Beispiel Facility GmbH" in text and "Musterallee 80-82" in text and "70191 Stuttgart" in text
-    assert "Erika Musterfrau" in text and "Beispielweg 5" not in text
-    # Die Mail geht weiterhin über eBay an den Käufer
-    assert versand.nachrichten[0]["To"].addresses[0].addr_spec.endswith("@members.ebay.com")
+    assert "Beispielweg 5" not in text and "Erika Musterfrau" not in text
+    assert "Sehr geehrte Damen und Herren," in text
+    # Die Mail geht weiterhin über eBay an den Käufer und spricht ihn persönlich an
+    nachricht = versand.nachrichten[0]
+    assert nachricht["To"].addresses[0].addr_spec.endswith("@members.ebay.com")
+    assert nachricht.get_body(("plain",)).get_content().startswith("Guten Tag Erika Musterfrau,")
 
 
 def test_freigabe_wie_bestellt(projekt, server):
@@ -203,3 +215,29 @@ def test_inhaber_auf_der_rechnung(projekt, versand):
     text = pypdf.PdfReader(konfig.speicher.archiv / "2026" / "RE-2026-00001.pdf").pages[0].extract_text()
     assert "Lampenladen Muster · Maria Muster · Teststraße 1" in text
     assert "Inh. Maria Muster" in text
+
+
+# --- Nummernkreis ----------------------------------------------------------------------------------
+
+
+def test_an_bisherige_rechnungsnummern_anschliessen(projekt, versand, capsys):
+    projekt.bestellungen(zeile(1, "26.11.2026"), zeile(2, "01.01.2027", kunde="K2", email="max@example.com"))
+    konfig = projekt.einstellung("rechnung", 'nummer_format = "{jahr}-{nummer}"').konfig()
+    c = ["-c", str(projekt.config)]
+
+    assert cli.main(["nummernkreis", *c, "--jahr", "2026"]) == 0
+    assert "erste Rechnung wird 2026-1" in capsys.readouterr().out
+
+    assert cli.main(["nummernkreis", *c, "--letzte", "250", "--jahr", "2026"]) == 0
+    assert "nächste Rechnung 2026-251" in capsys.readouterr().out
+
+    ausfuehren(konfig, date(2026, 11, 26), versand=versand, jetzt=datetime(2026, 11, 26, 23, 55, tzinfo=BERLIN))
+    ausfuehren(konfig, date(2027, 1, 1), versand=versand, jetzt=datetime(2027, 1, 1, 23, 55, tzinfo=BERLIN))
+    assert [r.nummer for r in rechnungen(konfig)] == ["2026-251", "2027-1"]
+
+    # Zurücksetzen würde doppelte Nummern erzeugen
+    assert cli.main(["nummernkreis", *c, "--letzte", "100", "--jahr", "2026"]) == 2
+    assert cli.main(["nummernkreis", *c, "--jahr", "2027"]) == 0
+    ausgabe = capsys.readouterr().out
+    assert "2026: zuletzt vergeben 2026-251, nächste Rechnung 2026-252" in ausgabe
+    assert "2027: zuletzt vergeben 2027-1, nächste Rechnung 2027-2" in ausgabe

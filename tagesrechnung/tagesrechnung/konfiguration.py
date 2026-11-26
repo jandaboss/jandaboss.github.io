@@ -41,6 +41,7 @@ FELDER: dict[str, bool] = {
 
 # Platzhalter, die in Betreff, E-Mail-Text und Rechnungstexten erlaubt sind
 PLATZHALTER = {
+    "anrede": "Guten Tag Erika Musterfrau",  # bei Rechnungen nur an eine Firma: „Sehr geehrte Damen und Herren“
     "nummer": "RE-2026-00001",
     "datum": "22.11.2026",
     "rechnungsdatum": "22.11.2026",
@@ -53,7 +54,7 @@ PLATZHALTER = {
 }
 
 STANDARD_EINLEITUNG = (
-    "Guten Tag {name},\n\n"
+    "{anrede},\n\n"
     "vielen Dank für Ihre Bestellung. Hiermit stellen wir Ihnen folgende Lieferungen und Leistungen in Rechnung:"
 )
 STANDARD_ZAHLUNGSHINWEIS = (
