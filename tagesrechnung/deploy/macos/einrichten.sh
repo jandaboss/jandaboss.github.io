@@ -26,7 +26,7 @@ esac
 
 # --- 1. Python 3.11 oder neuer finden (nicht das veraltete /usr/bin/python3 von macOS) ---------------
 PY=""
-for kandidat in python3.14 python3.13 python3.12 python3.11 python3; do
+for kandidat in python3.16 python3.15 python3.14 python3.13 python3.12 python3.11 python3; do
   pfad="$(command -v "$kandidat" 2>/dev/null || true)"
   if [ -z "$pfad" ] || [ "$pfad" = "/usr/bin/python3" ]; then
     continue
