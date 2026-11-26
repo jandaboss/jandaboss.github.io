@@ -7,7 +7,8 @@
 # Ihr Gewerbe – erscheint im Briefkopf und in der Fußzeile jeder Rechnung
 # ---------------------------------------------------------------------------------------------
 [firma]
-name = "Max Muster Handel"
+name = "Max Muster Handel"      # Ihr Shop- bzw. Geschäftsname
+inhaber = "Max Muster"          # Ihr vollständiger Name – Pflicht, wenn der Shopname ihn nicht enthält
 strasse = "Musterstraße 1"
 plz = "12345"
 ort = "Musterstadt"
@@ -46,6 +47,10 @@ schlusstext = "Vielen Dank für Ihren Einkauf!"
 einleitung = """Guten Tag {name},
 
 vielen Dank für Ihren Einkauf bei eBay. Hiermit erhalten Sie die Rechnung zu Ihrer Bestellung:"""
+
+# Abweichende Rechnungsanschriften je Bestellung (z. B. „Rechnung bitte auf meine Firma“).
+# Einträge am einfachsten mit:  tagesrechnung anschrift BESTELLNUMMER --firma … --strasse … --plz … --ort …
+anschriften = "rechnungsanschriften.toml"
 
 # WICHTIG für den ersten Lauf: Bestellungen vor diesem Tag werden nie abgerechnet.
 # Auf den Tag setzen, ab dem das Programm Rechnungen verschicken soll.

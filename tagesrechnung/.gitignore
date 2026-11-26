@@ -2,6 +2,7 @@
 config.toml
 *.env
 ebay-zugang.json
+rechnungsanschriften.toml
 *.tmp
 
 # Rechnungen, Rechnungsbuch und Kundendaten gehören nicht ins (öffentliche) Repository

@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Protocol
 
+from . import anschriften as anschriften_modul
 from . import formate, pdf, quellen
 from .berechnung import bestellungen_bilden, gruppieren, summen_berechnen
 from .konfiguration import Konfiguration
@@ -81,7 +82,14 @@ def ausfuehren(
                 return bericht
             zeitraum = formate.datum(stichtag) if von == stichtag else f"{formate.datum(von)}–{formate.datum(stichtag)}"
             try:
-                geladen = quellen.laden(konfig.quelle, von, stichtag, zeitzone, konfig.rechnung.standard_ust_satz)
+                anschriften = anschriften_modul.laden(konfig.rechnung.anschriften_datei)
+            except anschriften_modul.AnschriftenFehler as fehler:
+                log.error("Rechnungsanschriften: %s", fehler)
+                bericht.datenfehler.append(str(fehler))
+                return bericht
+            try:
+                geladen = quellen.laden(konfig.quelle, von, stichtag, zeitzone, konfig.rechnung.standard_ust_satz,
+                                        freigegeben=frozenset(anschriften))
             except quellen.QuellenFehler as fehler:
                 log.error("Bestellungen konnten nicht geladen werden: %s", fehler)
                 bericht.datenfehler.append(str(fehler))
@@ -96,6 +104,12 @@ def ausfuehren(
             for meldung in fehler:
                 log.error("%s", meldung)
             bericht.datenfehler += fehler
+
+            for b in bestellungen:
+                if b.nummer in anschriften and not anschriften[b.nummer].wie_bestellt:
+                    b.kunde = anschriften[b.nummer].anwenden(b.kunde, b.nummer)
+                    log.info("Bestellung %s: abweichende Rechnungsanschrift %s", b.nummer,
+                             anschriften[b.nummer].beschreibung())
 
             schon = buch.abgerechnet(b.nummer for b in bestellungen)
             bericht.bereits_abgerechnet = len(schon)

@@ -18,6 +18,7 @@ import itertools
 import json
 import logging
 import os
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -56,6 +57,18 @@ LAENDER = {
 
 class EbayFehler(Exception):
     pass
+
+
+# Käuferhinweise, die wahrscheinlich die Rechnung betreffen („Rechnung bitte auf Fa. … GmbH“)
+_RECHNUNGSHINWEIS = re.compile(
+    r"rechnung|firma|\bfa\b|gmbh|\bag\b|\bug\b|\bkg\b|\bohg\b|\bgbr\b|\be\.\s?[kv]\.|\bust\b|ust-?id|"
+    r"steuer|ausstellen|invoice|billing|company|\bvat\b",
+    re.IGNORECASE,
+)
+
+
+def betrifft_rechnung(hinweis: str) -> bool:
+    return bool(_RECHNUNGSHINWEIS.search(hinweis))
 
 
 # --- HTTP ---------------------------------------------------------------------------------------
@@ -270,6 +283,7 @@ class EbayBestellung:
     positionen: list[Position] = field(default_factory=list)
     grund: str = ""  # warum (noch) nicht abrechenbar
     fehler: bool = False  # True: muss von Hand geklärt werden
+    hinweis: str = ""  # Nachricht des Käufers beim Kauf
 
     @property
     def abrechenbar(self) -> bool:
@@ -289,8 +303,11 @@ def _betrag(daten: dict | None, feld: str) -> Decimal | None:
 
 
 def auswerten(
-    bestellung: dict, einst: EbayEinstellungen, zeitzone: ZoneInfo, standard_ust_satz: Decimal
+    bestellung: dict, einst: EbayEinstellungen, zeitzone: ZoneInfo, standard_ust_satz: Decimal,
+    freigegeben: frozenset[str] | set[str] = frozenset(),
 ) -> EbayBestellung:
+    """``freigegeben``: Bestellnummern, für die eine Rechnungsanschrift eingetragen oder die
+    ausdrücklich freigegeben wurden – Käuferhinweise halten sie nicht mehr an."""
     nummer = str(bestellung.get("orderId") or "?")
     kaeufer_daten = bestellung.get("buyer") or {}
     registriert = kaeufer_daten.get("buyerRegistrationAddress") or {}
@@ -305,6 +322,7 @@ def auswerten(
         betrag=None,
         zahlstatus=zahlstatus,
         hat_email=bool(registriert.get("email") or lieferung.get("email")),
+        hinweis=str(bestellung.get("buyerCheckoutNotes") or "").strip(),
     )
     try:
         ergebnis.zeit = zeitpunkt_lesen(bestellung.get("creationDate"), zeitzone)
@@ -324,6 +342,15 @@ def auswerten(
     elif einst.nur_bezahlte and zahlstatus != "PAID":
         ergebnis.grund = "noch nicht bezahlt"
     if ergebnis.grund:
+        return ergebnis
+
+    if ergebnis.hinweis and nummer not in freigegeben and betrifft_rechnung(ergebnis.hinweis):
+        ergebnis.grund = (
+            f"Käuferhinweis zur Rechnung: „{ergebnis.hinweis}“ – Rechnungsanschrift eintragen mit "
+            f"„tagesrechnung anschrift {nummer} --firma … --strasse … --plz … --ort …“ "
+            f"oder unverändert freigeben mit „tagesrechnung anschrift {nummer} --wie-bestellt“"
+        )
+        ergebnis.fehler = True
         return ergebnis
 
     try:
@@ -499,6 +526,7 @@ def zeitraum_utc(von: date, bis: date, zeitzone: ZoneInfo, jetzt: datetime) -> t
 def abrufen(
     einst: EbayEinstellungen, von: date, bis: date, zeitzone: ZoneInfo, standard_ust_satz: Decimal,
     jetzt: datetime | None = None, konto: EbayKonto | None = None,
+    freigegeben: frozenset[str] | set[str] = frozenset(),
 ) -> list[EbayBestellung]:
     konto = konto or EbayKonto(einst)
     zeitraum = zeitraum_utc(von, bis, zeitzone, jetzt or datetime.now(timezone.utc))
@@ -506,7 +534,7 @@ def abrufen(
         return []
     bestellungen = konto.bestellungen(*zeitraum)
     _freigabe_pruefen(konto)
-    return [auswerten(b, einst, zeitzone, standard_ust_satz) for b in bestellungen]
+    return [auswerten(b, einst, zeitzone, standard_ust_satz, freigegeben) for b in bestellungen]
 
 
 def _freigabe_pruefen(konto: EbayKonto) -> None:

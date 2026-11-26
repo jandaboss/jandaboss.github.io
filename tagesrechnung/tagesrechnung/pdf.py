@@ -302,7 +302,7 @@ def _land(name: str) -> str:
 def _fusszeile(c: rl_canvas.Canvas, konfig: Konfiguration, normal: str) -> None:
     f = konfig.firma
     spalten = [
-        [f.name, f.strasse, f"{f.plz} {f.ort}".strip(), f.land],
+        [f.name, f"Inh. {f.inhaber}" if f.inhaber else "", f.strasse, f"{f.plz} {f.ort}".strip(), f.land],
         [f"Tel. {f.telefon}" if f.telefon else "", f.email, f.webseite],
         [f.bank, f"IBAN {f.iban}" if f.iban else "", f"BIC {f.bic}" if f.bic else ""],
         [

@@ -119,7 +119,7 @@ tagesrechnung ausfuehren --nachholen 7 --probelauf
   aufgeführt. Bei gemischten Steuersätzen (`[ebay.ust_saetze]`) werden die Versandkosten anteilig
   aufgeteilt.
 * **Rechnungsanschrift** ist die beim eBay-Konto des Käufers hinterlegte Adresse, ersatzweise die
-  Lieferanschrift.
+  Lieferanschrift. Wünscht der Käufer eine andere Anschrift, siehe unten.
 * **Rücksendungen nach dem Rechnungsversand** erzeugen keine automatische Gutschrift. Diese bitte von Hand
   ausstellen.
 
@@ -209,6 +209,34 @@ die Bestelldaten erreicht. GitHub Pages (diese Website) kann keine Programme aus
 Am **Rückgabewert** erkennt die Zeitsteuerung, ob alles geklappt hat: `0` = alles versendet,
 `1` = Versand- oder Datenfehler (Details im Log), `2` = Konfigurations- oder Bedienfehler.
 
+## Käuferhinweise und abweichende Rechnungsanschrift
+
+Schreibt ein eBay-Käufer beim Kauf etwas wie *„Bitte stellen Sie die Rechnung auf die Fa. … GmbH aus“*,
+erkennt das Programm das an Wörtern wie „Rechnung“, „Firma“, „GmbH“ oder „USt-IdNr.“. Es hält die
+Bestellung dann an, statt die Rechnung an die falsche Anschrift zu schicken, und meldet sie bei jedem Lauf.
+Auch `ebay-pruefen` zeigt den Hinweis an. Andere Hinweise („bitte als Geschenk verpacken“) halten nichts
+auf.
+
+Gewünschte Anschrift eintragen (der Name des Käufers bleibt als Ansprechpartner stehen):
+
+```bash
+tagesrechnung anschrift 12-34567-89012 --firma "Beispiel GmbH" --strasse "Musterstr. 1" --plz 70191 --ort Stuttgart
+```
+
+Oder die Bestellung ohne Änderung freigeben:
+
+```bash
+tagesrechnung anschrift 12-34567-89012 --wie-bestellt
+```
+
+Der nächste Lauf erstellt dann die Rechnung. Die Bestellung bekommt eine eigene Rechnung, auch wenn derselbe
+Käufer am selben Tag noch mehr gekauft hat. Die Einträge stehen in `rechnungsanschriften.toml` und
+funktionieren genauso für CSV- und SQLite-Bestellungen. Ist die Bestellung schon abgerechnet, warnt der
+Befehl. Die bestehende Rechnung muss dann von Hand korrigiert werden.
+
+Angehaltene Bestellungen holt der tägliche Lauf mit `--nachholen 7` noch bis zu 7 Tage lang nach. Danach
+bitte mit `--datum` gezielt abrechnen.
+
 ## Befehle
 
 ```bash
@@ -221,6 +249,7 @@ tagesrechnung liste --offen                 # noch nicht zugestellte Rechnungen
 tagesrechnung testmail ich@example.com      # SMTP-Einstellungen prüfen
 tagesrechnung ebay-verbinden                # einmalig: Programm mit dem eBay-Konto verbinden
 tagesrechnung ebay-pruefen --tage 14        # eBay-Bestellungen ansehen, ohne abzurechnen
+tagesrechnung anschrift NR --firma … --strasse … --plz … --ort …   # abweichende Rechnungsanschrift
 ```
 
 Alle Befehle akzeptieren `-c pfad/zur/config.toml`, `--logdatei datei.log` und `-v`.
@@ -244,6 +273,8 @@ und vermerkt, welche Bestellung auf welcher Rechnung steht. **Sichern Sie es zus
 * Die Rechnungen enthalten die Pflichtangaben nach § 14 Abs. 4 UStG, sofern Firmen- und Kundendaten
   vollständig gepflegt sind. Rechnungen und Rechnungsbuch unterliegen den gesetzlichen
   Aufbewahrungsfristen (GoBD).
+* **Einzelunternehmen mit Shopnamen:** Auf die Rechnung gehört Ihr vollständiger Name. Dafür
+  `inhaber = "Vorname Nachname"` angeben, er erscheint in Absenderzeile und Fußzeile.
 * **Kleinunternehmer (§ 19 UStG)** setzen `kleinunternehmer = true`. Sie sind außerdem dauerhaft von der
   Pflicht befreit, E-Rechnungen auszustellen.
 * **E-Rechnung im B2B-Bereich:** Für Rechnungen an Unternehmen in Deutschland wird die strukturierte
@@ -264,4 +295,4 @@ pytest
 
 Aufbau: `quellen.py` (Bestelldaten lesen, `ebay.py` für eBay) → `berechnung.py` (Bestellungen gruppieren, Summen) →
 `pdf.py` (Rechnung) → `versand.py` (E-Mail) · `rechnungsbuch.py` (Nummernkreis, Status) ·
-`ablauf.py` (Tageslauf) · `cli.py` (Kommandozeile).
+`anschriften.py` (abweichende Rechnungsanschriften) · `ablauf.py` (Tageslauf) · `cli.py` (Kommandozeile).

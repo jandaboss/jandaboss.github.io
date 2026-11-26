@@ -77,6 +77,7 @@ class Firma:
     strasse: str
     plz: str
     ort: str
+    inhaber: str = ""  # bei Einzelunternehmen mit Geschäftsbezeichnung: vollständiger Name des Inhabers
     land: str = ""
     telefon: str = ""
     email: str = ""
@@ -91,7 +92,8 @@ class Firma:
     logo: Path | None = None
 
     def absenderzeile(self) -> str:
-        return " · ".join(t for t in (self.name, self.strasse, f"{self.plz} {self.ort}".strip()) if t)
+        teile = (self.name, self.inhaber, self.strasse, f"{self.plz} {self.ort}".strip())
+        return " · ".join(t for t in teile if t)
 
 
 @dataclass
@@ -105,6 +107,7 @@ class RechnungsEinstellungen:
     kleinunternehmer: bool = False
     zahlungsziel_tage: int = 14
     abrechnen_ab: date | None = None  # ältere Bestellungen werden nie abgerechnet
+    anschriften_datei: Path | None = None  # abweichende Rechnungsanschriften je Bestellung
     einleitung: str = STANDARD_EINLEITUNG
     zahlungshinweis: str = STANDARD_ZAHLUNGSHINWEIS
     schlusstext: str = STANDARD_SCHLUSSTEXT
@@ -283,6 +286,7 @@ def _firma(l: _Leser, basis: Path) -> Firma:
         strasse=l.text("strasse"),
         plz=l.text("plz"),
         ort=l.text("ort"),
+        inhaber=l.text("inhaber", ""),
         land=l.text("land", ""),
         telefon=l.text("telefon", ""),
         email=l.text("email", ""),
@@ -350,6 +354,7 @@ def _rechnung(l: _Leser, basis: Path) -> RechnungsEinstellungen:
         kleinunternehmer=l.schalter("kleinunternehmer", False),
         zahlungsziel_tage=zahlungsziel,
         abrechnen_ab=abrechnen_ab,
+        anschriften_datei=l.pfad("anschriften", basis, "rechnungsanschriften.toml"),
         einleitung=l.vorlage("einleitung", STANDARD_EINLEITUNG),
         zahlungshinweis=l.vorlage("zahlungshinweis", STANDARD_ZAHLUNGSHINWEIS),
         schlusstext=l.vorlage("schlusstext", STANDARD_SCHLUSSTEXT),

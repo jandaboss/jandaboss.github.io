@@ -41,10 +41,13 @@ def laden(
     bis: date,
     zeitzone: ZoneInfo,
     standard_ust_satz: Decimal,
+    freigegeben: frozenset[str] | set[str] = frozenset(),
 ) -> Ladeergebnis:
-    """Alle Positionen, deren Bestelldatum (in ``zeitzone``) zwischen ``von`` und ``bis`` liegt."""
+    """Alle Positionen, deren Bestelldatum (in ``zeitzone``) zwischen ``von`` und ``bis`` liegt.
+
+    ``freigegeben``: Bestellnummern mit eingetragener Rechnungsanschrift (nur für eBay relevant)."""
     if quelle.typ == "ebay":
-        return _ebay_laden(quelle, von, bis, zeitzone, standard_ust_satz)
+        return _ebay_laden(quelle, von, bis, zeitzone, standard_ust_satz, freigegeben)
     if quelle.typ == "csv":
         zeilen = _csv_zeilen(quelle)
     else:
@@ -74,17 +77,19 @@ def laden(
 
 
 def _ebay_laden(quelle: QuellenEinstellungen, von: date, bis: date, zeitzone: ZoneInfo,
-                standard_ust_satz: Decimal) -> Ladeergebnis:
+                standard_ust_satz: Decimal, freigegeben) -> Ladeergebnis:
     from . import ebay
 
     try:
-        bestellungen = ebay.abrufen(quelle.ebay, von, bis, zeitzone, standard_ust_satz)
+        bestellungen = ebay.abrufen(quelle.ebay, von, bis, zeitzone, standard_ust_satz, freigegeben=freigegeben)
     except ebay.EbayFehler as fehler:
         raise QuellenFehler(str(fehler)) from None
     ergebnis = Ladeergebnis()
     for b in bestellungen:
         if b.abrechenbar:
             ergebnis.positionen += b.positionen
+            if b.hinweis:
+                log.info("Käuferhinweis zu eBay-Bestellung %s: „%s“", b.nummer, b.hinweis)
         elif b.fehler:
             ergebnis.fehler.append(f"eBay-Bestellung {b.nummer} ({b.kaeufer}): {b.grund}")
             ergebnis.fehlerhafte_bestellungen.add(b.nummer)
